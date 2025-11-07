@@ -67,6 +67,42 @@ uv run python -m src.cli.scrape_images \
 uv run python -m unittest discover -s tests/unit
 ```
 
+## FastAPI API サーバの利用
+
+FastAPI によるHTTP APIも利用できます（OpenAPIドキュメント: /docs）。
+
+```zsh
+# 依存を同期
+uv sync
+
+# サーバ起動（開発用）
+uv run uvicorn src.api.app:app --reload --port 8000
+```
+
+エンドポイント:
+- GET /healthz -> { "status": "ok" }
+- POST /scrape -> リクエスト例:
+
+```json
+{
+  "url": "https://example.com",
+  "output_dir": "./images",
+  "respect_robots": true,
+  "upload_to_drive": false
+}
+```
+
+レスポンス例:
+
+```json
+{
+  "saved": 12,
+  "failed": 0,
+  "output_dir": "./images",
+  "files": ["images/abc123.png", "images/def456.jpg"]
+}
+```
+
 ## 注意点 / ベストプラクティス
 
 - robots.txt とサイト規約を厳密に尊重します（ページ・画像URLともに不許可はスキップ/中止）。
