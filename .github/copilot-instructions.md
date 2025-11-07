@@ -56,3 +56,10 @@ uv run python -m unittest discover -s tests/unit
 
 - Align with principles in `/.specify/memory/constitution.md`.
 - If a rule must be waived, explain in PR and add minimal tests/logging.
+
+## Active Technologies
+- Python 3.11 + FastAPI, uvicorn[standard], pydantic（FastAPI経由） (001-fastapi-api)
+- ローカルファイル（`./images`）。Driveは任意連携（既存の `[drive]` extras） (001-fastapi-api)
+
+## Recent Changes
+- 001-fastapi-api: Added Python 3.11 + FastAPI, uvicorn[standard], pydantic（FastAPI経由）
