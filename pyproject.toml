@@ -1,0 +1,19 @@
+[project]
+authors = [{name = "Unknown"}]
+description = "Web page image scraper with optional Google Drive upload"
+license = {text = "MIT"}
+name = "image-saver"
+readme = "README.md"
+requires-python = ">=3.11"
+version = "0.1.0"
+
+dependencies = [
+  "requests>=2.32.0",
+  "beautifulsoup4>=4.12.0",
+]
+
+[project.optional-dependencies]
+drive = ["google-api-python-client>=2.149.0", "google-auth>=2.35.0"]
+
+[tool.uv]
+# Minimal uv table; remove unsupported sub-tables to avoid warnings
