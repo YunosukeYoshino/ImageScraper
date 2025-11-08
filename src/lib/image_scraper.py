@@ -29,7 +29,8 @@ import re
 import time
 import mimetypes
 from dataclasses import dataclass
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 import hashlib
 from urllib.parse import urlparse, urljoin
@@ -270,4 +271,46 @@ def download_images(image_urls: List[str], output_dir: str, drive_service=None, 
                 except Exception as e:
                     logging.error(f"Drive upload failed for {local}: {e}")
     return saved_files
+
+
+def download_images_parallel(image_urls: List[str], output_dir: str, max_workers: int = 8, respect_robots: bool = True, progress_cb: Optional[Callable[[int, int], None]] = None) -> List[str]:
+    """Parallel version of download_images with progress callback.
+
+    Args:
+        image_urls: list of image URLs to download.
+        output_dir: destination directory.
+        max_workers: concurrency level.
+        respect_robots: skip disallowed images.
+        progress_cb: optional callback invoked as progress_cb(done_count, total).
+    Returns:
+        List of saved file paths (order not guaranteed).
+    """
+    _ensure_dir(output_dir)
+    total = len(image_urls)
+    done = 0
+    results: List[str] = []
+
+    def _task(u: str) -> Optional[str]:
+        if respect_robots and not _robots_allowed(u):
+            logging.warning(f"robots.txt disallows fetching image: {u}")
+            return None
+        return _download_image(u, output_dir)
+
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        future_map = {ex.submit(_task, u): u for u in image_urls}
+        for fut in as_completed(future_map):
+            res = None
+            try:
+                res = fut.result()
+            except Exception as e:  # pragma: no cover - defensive
+                logging.error(f"Parallel download failed: {e}")
+            if res:
+                results.append(res)
+            done += 1
+            if progress_cb:
+                try:
+                    progress_cb(done, total)
+                except Exception:  # pragma: no cover
+                    pass
+    return results
 
