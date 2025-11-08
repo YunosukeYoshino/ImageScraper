@@ -17,14 +17,14 @@
   the iteration process.
 -->
 
-**Language/Version**: Python 3.11  
-**Primary Dependencies**: FastAPI (既存API), requests, BeautifulSoup, Streamlit(UI層)  
-**Storage**: N/A（ローカルブラウザ保存のみ）  
-**Testing**: unittest（既存） + 追加でUIロジック分離した関数を単体テスト（JSONバリデーション等）  
-**Target Platform**: macOS/Linux 開発環境 + ブラウザ  
-**Project Type**: single project (library + API + UI)  
-**Performance Goals**: 単一リクエスト結果表示 ≤3秒（既存API呼び出し+整形）  
-**Constraints**: メモリ軽量（UIで大量保持しない）、外部API接続機能は追加しない  
+**Language/Version**: Python 3.11
+**Primary Dependencies**: FastAPI (既存API), requests, BeautifulSoup, Streamlit(UI層)
+**Storage**: N/A（ローカルブラウザ保存のみ）
+**Testing**: unittest（既存） + 追加でUIロジック分離した関数を単体テスト（JSONバリデーション等）
+**Target Platform**: macOS/Linux 開発環境 + ブラウザ
+**Project Type**: single project (library + API + UI)
+**Performance Goals**: 単一リクエスト結果表示 ≤3秒（既存API呼び出し+整形）
+**Constraints**: メモリ軽量（UIで大量保持しない）、外部API接続機能は追加しない
 **Scale/Scope**: ユーザー少数（内部開発者）・画面数 1（メイン）+ モーダル程度
 
 ## Constitution Check
