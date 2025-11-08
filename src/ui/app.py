@@ -2,9 +2,17 @@ from __future__ import annotations
 import json
 import time
 from typing import Dict, Optional, Tuple
+import sys
+from pathlib import Path
 
 import requests
 import streamlit as st
+
+# Ensure repository root is importable when run via Streamlit
+_THIS_FILE = Path(__file__).resolve()
+_REPO_ROOT = _THIS_FILE.parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from src.lib.ui_helpers import (
     validate_json_text,
