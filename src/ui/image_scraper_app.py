@@ -41,8 +41,11 @@ if run:
 
                 if result.saved_files:
                     st.subheader("保存した画像")
-                    for path in result.saved_files:
-                        st.image(path, caption=path, use_column_width=True)
+                    cols = st.columns(5)
+                    for idx, path in enumerate(result.saved_files):
+                        col = cols[idx % 5]
+                        with col:
+                            st.image(path, caption=Path(path).name, use_container_width=True)
                 else:
                     st.info("保存された画像はありません。フィルタやrobotsで除外された可能性があります。")
             except PermissionError as e:
