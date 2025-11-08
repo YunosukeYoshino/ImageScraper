@@ -63,9 +63,39 @@ uv run python -m src.cli.scrape_images \
 
 ## テスト実行
 
+まず依存を同期しておきます。
+
+```zsh
+uv sync
+```
+
+すべてのユニットテスト（`tests/unit` 配下）を実行:
+
 ```zsh
 uv run python -m unittest discover -s tests/unit
 ```
+
+詳細ログ（verbose）で実行:
+
+```zsh
+uv run python -m unittest discover -s tests/unit -v
+```
+
+特定のテストファイルのみ実行（例: API テスト）:
+
+```zsh
+uv run python -m unittest tests.unit.test_api
+```
+
+特定のテストケースのみ実行（クラス/メソッドを指定）:
+
+```zsh
+uv run python -m unittest tests.unit.test_api.TestAPI.test_healthz
+```
+
+メモ:
+- テストは実ネットワークを利用しないようモック化しています。
+- 一部テストは `./.tmp_test_out/` に一時ファイルを作成します。不要になれば削除して構いません。
 
 ## FastAPI API サーバの利用
 

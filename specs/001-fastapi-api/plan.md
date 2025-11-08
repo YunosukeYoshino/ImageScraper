@@ -17,14 +17,14 @@
   the iteration process.
 -->
 
-**Language/Version**: Python 3.11  
-**Primary Dependencies**: FastAPI, uvicorn[standard], pydantic（FastAPI経由）  
-**Storage**: ローカルファイル（`./images`）。Driveは任意連携（既存の `[drive]` extras）  
-**Testing**: unittest（既存に合わせる）＋ FastAPI TestClient  
-**Target Platform**: Linux/macOS サーバ  
-**Project Type**: Single project（`src/api` 追加）  
-**Performance Goals**: 単一URLの処理 <2s p95（憲法の性能目安に準拠）  
-**Constraints**: robots尊重、リトライ/バックオフ、観測性（logging）を維持  
+**Language/Version**: Python 3.11
+**Primary Dependencies**: FastAPI, uvicorn[standard], pydantic（FastAPI経由）
+**Storage**: ローカルファイル（`./images`）。Driveは任意連携（既存の `[drive]` extras）
+**Testing**: unittest（既存に合わせる）＋ FastAPI TestClient
+**Target Platform**: Linux/macOS サーバ
+**Project Type**: Single project（`src/api` 追加）
+**Performance Goals**: 単一URLの処理 <2s p95（憲法の性能目安に準拠）
+**Constraints**: robots尊重、リトライ/バックオフ、観測性（logging）を維持
 **Scale/Scope**: 低〜中負荷前提（高度な並列は将来拡張）
 
 ## Constitution Check
