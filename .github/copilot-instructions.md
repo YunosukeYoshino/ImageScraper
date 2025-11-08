@@ -60,6 +60,8 @@ uv run python -m unittest discover -s tests/unit
 ## Active Technologies
 - Python 3.11 + FastAPI, uvicorn[standard], pydantic（FastAPI経由） (001-fastapi-api)
 - ローカルファイル（`./images`）。Driveは任意連携（既存の `[drive]` extras） (001-fastapi-api)
+- Python 3.11 + FastAPI (既存API), requests, BeautifulSoup, Streamlit(UI層) (001-streamlit-api-ui)
+- N/A（ローカルブラウザ保存のみ） (001-streamlit-api-ui)
 
 ## Recent Changes
 - 001-fastapi-api: Added Python 3.11 + FastAPI, uvicorn[standard], pydantic（FastAPI経由）

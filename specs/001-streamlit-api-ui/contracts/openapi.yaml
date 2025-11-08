@@ -1,0 +1,106 @@
+openapi: 3.1.0
+info:
+  title: image-saver UI helper contracts
+  version: 0.1.0
+  description: Contracts derived from APIリクエストUI feature (internal helper endpoints are illustrative; primary API already exists under src/api)
+servers:
+  - url: /
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+  /scrape:
+    post:
+      summary: Scrape images from a page (existing API)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScrapeRequest'
+      responses:
+        '200':
+          description: Summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScrapeSummary'
+        '4XX':
+          description: Client error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '5XX':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    ScrapeRequest:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        output_dir:
+          type: string
+          default: ./images
+        respect_robots:
+          type: boolean
+          default: true
+        upload_to_drive:
+          type: boolean
+          default: false
+        drive_folder_id:
+          type: string
+          nullable: true
+      required: [url]
+    ScrapeSummary:
+      type: object
+      properties:
+        saved:
+          type: integer
+        failed:
+          type: integer
+        output_dir:
+          type: string
+        uploaded:
+          type: integer
+          nullable: true
+        warnings:
+          type: array
+          items: { type: string }
+          nullable: true
+        errors:
+          type: array
+          items: { type: string }
+          nullable: true
+        files:
+          type: array
+          items: { type: string }
+          nullable: true
+      required: [saved, failed, output_dir]
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
