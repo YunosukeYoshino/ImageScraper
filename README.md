@@ -1,4 +1,4 @@
-# image-saver
+# Image Scraper
 
 Webページから画像URLを収集しダウンロード、必要に応じてGoogle Driveへアップロードするシンプルなツールです。
 
