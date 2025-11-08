@@ -224,3 +224,50 @@ __all__ = [
     "ScrapeResult",
     "_init_drive",
 ]
+
+# -- New helpers for UI preview/selective download --
+def list_images(url: str, limit: Optional[int] = None, respect_robots: bool = True) -> List[str]:
+    """Return normalized image URLs from a page without downloading."""
+    if respect_robots and not _robots_allowed(url):
+        raise PermissionError(f"Blocked by robots.txt: {url}")
+    response = _request_with_retry(url)
+    soup = BeautifulSoup(response.text, "html.parser")
+    raw_sources: List[str] = []
+    for img in soup.find_all("img"):
+        src = img.get("src") or img.get("data-src") or img.get("data-original")
+        if not src:
+            continue
+        raw_sources.append(src.strip())
+
+    normalized: List[str] = []
+    seen = set()
+    for src in raw_sources:
+        full = _normalize_url(src, url)
+        if full in seen:
+            continue
+        seen.add(full)
+        if _is_image_url(full):
+            normalized.append(full)
+    if limit is not None:
+        normalized = normalized[:limit]
+    return normalized
+
+
+def download_images(image_urls: List[str], output_dir: str, drive_service=None, drive_folder_id: Optional[str] = None, respect_robots: bool = True) -> List[str]:
+    """Download provided image URLs to output_dir, optionally uploading to Drive. Returns list of saved file paths."""
+    _ensure_dir(output_dir)
+    saved_files: List[str] = []
+    for img_url in image_urls:
+        if respect_robots and not _robots_allowed(img_url):
+            logging.warning(f"robots.txt disallows fetching image: {img_url}")
+            continue
+        local = _download_image(img_url, output_dir)
+        if local:
+            saved_files.append(local)
+            if drive_service:
+                try:
+                    _ = _drive_upload(drive_service, local, parent_folder_id=drive_folder_id)
+                except Exception as e:
+                    logging.error(f"Drive upload failed for {local}: {e}")
+    return saved_files
+
