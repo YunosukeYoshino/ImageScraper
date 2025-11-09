@@ -1,67 +1,78 @@
-# Copilot Instructions for image-saver
+# image-saver 用 Copilot 指示書
 
-These instructions help AI coding agents work productively in this repo. Keep responses concise and follow the repository’s conventions.
+このドキュメントは、このリポジトリで AI コーディングエージェントが生産的に作業するための指針です。返答は簡潔にし、リポジトリの規約に従ってください。
 
-## Architecture & Intent
+## アーキテクチャと意図
 
-- Single Python project managed by uv (`pyproject.toml`). Core logic lives under `src/`.
-- Main capability: scrape images from a web page and save locally; optionally upload to Google Drive using a service account.
-- Public entry points:
-  - Library: `src/lib/image_scraper.py` (exports `scrape_images`, `_init_drive`)
-  - CLI: `python -m src.cli.scrape_images` with flags (see below)
-- Tests reside under `tests/` (currently unit tests only).
+- 単一の Python プロジェクトで、uv により管理されています（`pyproject.toml`）。中核ロジックは `src/` 配下にあります。
+- 主機能: Web ページから画像をスクレイピングしてローカル保存。必要に応じてサービスアカウントを用いて Google Drive へアップロード可能。Streamlit UI を提供し、プレビュー／検索／選択／並列ダウンロードおよび ZIP での PC へのエクスポートをサポートします。
+- 公開エントリポイント:
+  - ライブラリ: `src/lib/image_scraper.py`（`scrape_images` と `_init_drive` をエクスポート。UI 向けヘルパーとして `list_images`、`download_images`、`download_images_parallel` も提供）
+  - CLI: `python -m src.cli.scrape_images`（詳細は下記）
+  - UI: `uv run streamlit run src/ui/image_scraper_app.py`
+- テストは `tests/` 配下にあります（現状はユニットテストのみ）。
 
-## Conventions & Patterns
+## 規約とパターン
 
-- CLI contracts: arguments → stdout (JSON summary), errors → stderr + non‑zero exit.
-- Networking: requests with retry/backoff; parse via BeautifulSoup.
-- Image detection: regex on common extensions plus fallback to path suffix check.
-- File naming: SHA‑256 hash of URL + inferred extension to avoid collisions.
-- Observability: use `logging` with INFO for saves/uploads and WARNING/ERROR for failures.
-- Robots: robots.txt を厳密に尊重（ページ/画像 URL ともに不許可はスキップ、ページ自体が不許可なら中止）。
-- Drive upload: optional dependency group `[drive]`; requires service account JSON and shared folder permissions.
+- CLI の契約: 引数 → stdout（JSON サマリ）、エラー → stderr + 非ゼロ終了コード。
+- ネットワーキング: requests を使用し、リトライ／バックオフを実装。パースには BeautifulSoup を使用。
+- 画像検出: 代表的な拡張子の正規表現 + パス末尾チェックのフォールバック。
+- ファイル命名: URL の SHA‑256 ハッシュ + 推定拡張子で衝突を回避。
+- 可観測性: 保存／アップロードは INFO、失敗は WARNING/ERROR で `logging` 出力。
+- Robots: robots.txt を厳密に尊重（ページ／画像 URL ともに不許可はスキップ。ページ自体が不許可なら中止）。
+- Drive へのアップロード: 追加依存グループ `[drive]`。サービスアカウント JSON と共有フォルダ権限が必要。
 
-## Key Files
+## 主要ファイル
 
-- `src/lib/image_scraper.py`: fetch, parse, download, Drive upload helpers.
-- `src/cli/scrape_images.py`: CLI argument parsing; prints a JSON summary.
-- `pyproject.toml`: uv project config; install optional `[drive]` when needed.
-- `README.md`: Setup (uv), usage examples, and test command.
-- `.specify/memory/constitution.md`: project rules (library-first, CLI, test-first, observability, integration safety).
+- `src/lib/image_scraper.py`: 取得、パース、ダウンロード、Drive アップロードのヘルパー。UI 向け `list_images`、`download_images`、`download_images_parallel` を提供。
+- `src/lib/ui_helpers.py`: UI ユーティリティ（JSON 検証、ヘッダーのマスキング、URL ビルダー、設定の保存／読み込み、レスポンスの要約）。
+- `src/cli/scrape_images.py`: CLI の引数解析。JSON サマリを出力。
+- `src/ui/image_scraper_app.py`: プレビュー／検索／ページング／選択と、ZIP 付き並列ダウンロードを備えた Streamlit アプリ。
+- `pyproject.toml`: uv のプロジェクト設定。必要に応じて `[drive]` をインストール。
+- `README.md`: セットアップ（uv）、使用例、テスト実行コマンド。
+- `.specify/memory/constitution.md`: プロジェクト規約（library-first、CLI、test-first、observability、統合の安全性）。
 
-## Build, Run, Test (macOS/zsh)
+## ビルド・実行・テスト（macOS/zsh）
 
 ```zsh
-# Setup env
+# 環境セットアップ
 uv sync
-# (Drive features)
+# （Drive 機能を使う場合）
 uv pip install .[drive]
 
-# Run scraper (output defaults to ./images)
+# スクレイパー実行（出力先はデフォルトで ./images）
 uv run python -m src.cli.scrape_images --url https://example.com
 
-# Tests
+# Streamlit UI 実行（プレビュー／検索／ページング／選択／並列 ZIP）
+uv run streamlit run src/ui/image_scraper_app.py
+
+# テスト
 uv run python -m unittest discover -s tests/unit
 ```
 
-## Implementation Tips (project‑specific)
+## 実装のヒント（プロジェクト固有）
 
-- Prefer adding features as small modules under `src/` with tests first.
-- When touching network/Drive boundaries, add retry and log failures; mock network in tests.
-- Keep CLI non-interactive; add new flags rather than prompts.出力先はデフォルト ./images。
-- Do not commit credentials; refer via env (`GDRIVE_SA_JSON`) or CLI flag.
-- For new integrations, expose both library function and CLI wrapper.
+- 機能追加は `src/` 配下の小さなモジュールとして行い、まずテストを追加することを推奨。
+- ネットワーク／Drive との境界に触れる場合は、リトライを入れ、失敗をログ化。テストではネットワークをモック。
+- CLI は非対話的に保ち、プロンプトではなくフラグを追加する。出力先はデフォルトで ./images。
+- 資格情報はコミットしない。環境変数（`GDRIVE_SA_JSON`）または CLI フラグで参照。
+- 新しい連携を追加する場合は、ライブラリ関数と CLI ラッパーの両方を公開。
+- UI 規約: Streamlit は 5 カラムグリッド、`use_container_width` を使用（`use_column_width` は非推奨）。「URL プレビュー → 選択 → 並列ダウンロード → ZIP ダウンロード」の流れ。robots.txt を尊重。
 
-## When Unsure
+## 不明な場合
 
-- Align with principles in `/.specify/memory/constitution.md`.
-- If a rule must be waived, explain in PR and add minimal tests/logging.
+- `/.specify/memory/constitution.md` の原則に合わせる。
+- 規約から外れる必要がある場合は、PR で理由を説明し、最小限のテスト／ログを追加。
 
-## Active Technologies
-- Python 3.11 + FastAPI, uvicorn[standard], pydantic（FastAPI経由） (001-fastapi-api)
-- ローカルファイル（`./images`）。Driveは任意連携（既存の `[drive]` extras） (001-fastapi-api)
-- Python 3.11 + FastAPI (既存API), requests, BeautifulSoup, Streamlit(UI層) (001-streamlit-api-ui)
-- N/A（ローカルブラウザ保存のみ） (001-streamlit-api-ui)
+## 使用技術
 
-## Recent Changes
-- 001-fastapi-api: Added Python 3.11 + FastAPI, uvicorn[standard], pydantic（FastAPI経由）
+- Python 3.11 + FastAPI、uvicorn[standard]、pydantic（FastAPI 経由）（001-fastapi-api）
+- ローカルファイル（`./images`）。Drive は任意連携（既存の `[drive]` extras）（001-fastapi-api）
+- Python 3.11 + FastAPI（既存 API）、requests、BeautifulSoup、Streamlit（UI 層）（001-streamlit-api-ui）
+- N/A（ローカルブラウザ保存のみ）（001-streamlit-api-ui）
+
+## 最近の変更
+
+- 001-fastapi-api: Python 3.11 + FastAPI、uvicorn[standard]、pydantic（FastAPI 経由）を追加。
+- Streamlit UI: `src/ui/image_scraper_app.py` を追加。プレビュー／検索／ページング／選択、並列ダウンロード、ZIP エクスポートをサポート。
+- ライブラリ: `list_images`、`download_images`、`download_images_parallel` を追加。`src/lib/ui_helpers.py` とユニットテストを追加。

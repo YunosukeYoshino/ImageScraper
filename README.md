@@ -1,9 +1,11 @@
 # Image Scraper
 
-Webページから画像URLを収集しダウンロード、必要に応じてGoogle Driveへアップロードするシンプルなツールです。
+Webページから画像URLを収集し、プレビュー/選択/並列ダウンロードでローカル保存、必要に応じてGoogle Driveへアップロードできるツールです。Streamlit UI と FastAPI/CLI を用意しています。
 
 - スクレイピング: requests + BeautifulSoup
-- 画像保存: ローカルディレクトリ
+- 画像保存: ローカルディレクトリ（デフォルト `./images`）
+- ユーザーPCへZIPダウンロード: Streamlit UI から一括ダウンロード
+- 並列ダウンロード + 進捗バー: UI から利用可能
 - Google Drive アップロード: サービスアカウント (任意)
 - パッケージ管理: uv (推奨)
 
@@ -33,7 +35,26 @@ uv pip install .[drive]
 
 ## 使い方
 
-### 画像のダウンロード (ローカルのみ)
+### Streamlit UI（URLを入れてプレビュー→選択→保存/ZIPダウンロード）
+
+```zsh
+uv run streamlit run src/ui/image_scraper_app.py
+```
+
+できること:
+- URLを入力してプレビュー（ダウンロードせず画像URLを抽出）
+- 検索（URL/ファイル名の部分一致）
+- ページング（ページサイズ: 10/25/50/100）
+- 全選択/全解除トグル（表示中のページに対して）
+- 並列ダウンロード（内部8ワーカー）+ 進捗バー表示
+- 保存後の画像をギャラリー表示（5カラム）
+- ZIPを作成し「ユーザーPCにダウンロード」
+
+注意:
+- robots.txt を既定で尊重します（ブロック時は警告）
+- ZIPは保存済みファイルから作成されます
+
+### CLI での画像ダウンロード (ローカルのみ)
 
 ```zsh
 uv run python -m src.cli.scrape_images \
@@ -96,6 +117,7 @@ uv run python -m unittest tests.unit.test_api.TestAPI.test_healthz
 メモ:
 - テストは実ネットワークを利用しないようモック化しています。
 - 一部テストは `./.tmp_test_out/` に一時ファイルを作成します。不要になれば削除して構いません。
+ - Streamlit アプリは `import` のスモーク時に警告を出すことがあります（`streamlit run` で実行すれば問題ありません）。
 
 ## FastAPI API サーバの利用
 
@@ -138,10 +160,15 @@ uv run uvicorn src.api.app:app --reload --port 8000
 - robots.txt とサイト規約を厳密に尊重します（ページ・画像URLともに不許可はスキップ/中止）。
 - 過剰な負荷を避け、レート制限・リトライ実装を活用してください。
 - 公開配布物に含めたくない資格情報(JSON)はコミットしないでください。
+ - 画像の著作権/利用規約を必ず確認の上、適切な範囲で利用してください。
 
 ## 構成
 
-- `src/lib/image_scraper.py`: コア機能 (取得、解析、保存、Drive アップロード)
+- `src/lib/image_scraper.py`: コア機能 (取得、解析、保存、Drive アップロード、プレビュー/並列ダウンロード)
+- `src/lib/ui_helpers.py`: UI補助（JSON検証、URL構築、設定保存/読込、レスポンス要約）
 - `src/cli/scrape_images.py`: CLI エントリポイント
+- `src/ui/image_scraper_app.py`: Streamlit UI（プレビュー/検索/ページング/選択/並列ダウンロード/ZIP）
 - `tests/unit/test_parse_images.py`: 最小ユニットテスト
+ - `tests/unit/test_list_and_download_images.py`: プレビュー・選択ダウンロードのテスト
+ - `tests/unit/test_parallel_download.py`: 並列ダウンロードと進捗のテスト
 
