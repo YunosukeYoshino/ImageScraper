@@ -32,7 +32,7 @@ class TestListAndDownloadImages(unittest.TestCase):
         old = mod._request_with_retry
         mod._request_with_retry = fake_request_with_retry
         try:
-            urls = mod.list_images("https://example.com/page")
+            urls = mod.list_images("https://example.com/page", respect_robots=False)
         finally:
             mod._request_with_retry = old
         self.assertEqual(len(urls), 3)

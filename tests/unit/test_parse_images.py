@@ -34,7 +34,7 @@ class TestParseImages(unittest.TestCase):
         old_fn = mod._request_with_retry
         mod._request_with_retry = fake_request_with_retry
         try:
-            res = mod.scrape_images("https://example.com/page", "./.tmp_test_out", limit=None)
+            res = mod.scrape_images("https://example.com/page", "./.tmp_test_out", limit=None, respect_robots=False)
         finally:
             mod._request_with_retry = old_fn
         self.assertEqual(res.page_url, "https://example.com/page")
