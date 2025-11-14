@@ -22,17 +22,27 @@ Minimal usage example (local save only):
     from src.lib.image_scraper import scrape_images
     scrape_images("https://example.com", "downloaded_images")
 
-With Google Drive upload (rclone):
+With Google Drive upload (rclone) - note: drive_uploader is keyword-only:
 
     from src.lib.drive_uploader import create_uploader
     uploader = create_uploader(method="rclone")
-    scrape_images("https://example.com", "images", drive_uploader=uploader, drive_folder="backups")
+    scrape_images(
+        "https://example.com",
+        "images",
+        drive_uploader=uploader,  # keyword-only parameter
+        drive_folder="backups"
+    )
 
-With Google Drive upload (service account):
+With Google Drive upload (service account) - note: drive_uploader is keyword-only:
 
     from src.lib.drive_uploader import create_uploader
     uploader = create_uploader(method="service_account", service_account_file="key.json")
-    scrape_images("https://example.com", "images", drive_uploader=uploader, drive_folder="folder_id")
+    scrape_images(
+        "https://example.com",
+        "images",
+        drive_uploader=uploader,  # keyword-only parameter
+        drive_folder="folder_id"
+    )
 """
 from __future__ import annotations
 import os
@@ -205,12 +215,12 @@ def scrape_images(
     url: str,
     output_dir: str,
     limit: Optional[int] = None,
-    drive_uploader: Optional["DriveUploader"] = None,
-    drive_folder: Optional[str] = None,
-    respect_robots: bool = True,
-    # Legacy parameters for backward compatibility
     drive_service=None,
     drive_folder_id: Optional[str] = None,
+    respect_robots: bool = True,
+    *,  # All parameters after this are keyword-only
+    drive_uploader: Optional["DriveUploader"] = None,
+    drive_folder: Optional[str] = None,
 ) -> ScrapeResult:
     """Scrape image sources from a page and optionally upload them to Google Drive.
 
@@ -218,20 +228,28 @@ def scrape_images(
         url: Page URL to scrape
         output_dir: Local directory to store images
         limit: Optional maximum number of images to process
-        drive_uploader: Optional DriveUploader instance for uploads (new interface)
-        drive_folder: Optional folder identifier (folder ID or path depending on uploader)
-        respect_robots: When True, abort if robots.txt disallows fetching the page
         drive_service: (DEPRECATED) Legacy Google Drive service instance
         drive_folder_id: (DEPRECATED) Legacy folder ID parameter
+        respect_robots: When True, abort if robots.txt disallows fetching the page
+        drive_uploader: (Keyword-only) DriveUploader instance for uploads (new interface)
+        drive_folder: (Keyword-only) Folder identifier (folder ID or path depending on uploader)
 
     Returns:
         ScrapeResult with details of the operation
 
     Example:
-        # Modern usage with rclone
+        # Modern usage with rclone (keyword-only parameters)
         from src.lib.drive_uploader import create_uploader
         uploader = create_uploader(method="rclone")
-        result = scrape_images("https://example.com", "./images", drive_uploader=uploader, drive_folder="backups")
+        result = scrape_images(
+            "https://example.com",
+            "./images",
+            drive_uploader=uploader,
+            drive_folder="backups"
+        )
+
+        # Legacy positional usage still works
+        result = scrape_images("https://example.com", "./images", None, service, folder_id, True)
     """
     _ensure_dir(output_dir)
     if respect_robots and not _robots_allowed(url):
@@ -326,26 +344,39 @@ def list_images(url: str, limit: Optional[int] = None, respect_robots: bool = Tr
 def download_images(
     image_urls: List[str],
     output_dir: str,
-    drive_uploader: Optional["DriveUploader"] = None,
-    drive_folder: Optional[str] = None,
-    respect_robots: bool = True,
-    # Legacy parameters
     drive_service=None,
     drive_folder_id: Optional[str] = None,
+    respect_robots: bool = True,
+    *,  # All parameters after this are keyword-only
+    drive_uploader: Optional["DriveUploader"] = None,
+    drive_folder: Optional[str] = None,
 ) -> List[str]:
     """Download provided image URLs to output_dir, optionally uploading to Drive.
 
     Args:
         image_urls: List of image URLs to download
         output_dir: Local directory to save images
-        drive_uploader: Optional DriveUploader instance for uploads (new interface)
-        drive_folder: Optional folder identifier (folder ID or path)
-        respect_robots: When True, skip images blocked by robots.txt
         drive_service: (DEPRECATED) Legacy Google Drive service instance
         drive_folder_id: (DEPRECATED) Legacy folder ID parameter
+        respect_robots: When True, skip images blocked by robots.txt
+        drive_uploader: (Keyword-only) DriveUploader instance for uploads (new interface)
+        drive_folder: (Keyword-only) Folder identifier (folder ID or path)
 
     Returns:
         List of saved file paths
+
+    Example:
+        # Modern usage with keyword-only parameters
+        uploader = create_uploader(method="rclone")
+        files = download_images(
+            urls,
+            "./images",
+            drive_uploader=uploader,
+            drive_folder="backups"
+        )
+
+        # Legacy positional usage still works
+        files = download_images(urls, "./images", service, folder_id, True)
     """
     _ensure_dir(output_dir)
     saved_files: List[str] = []
