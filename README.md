@@ -64,9 +64,123 @@ uv run python -m src.cli.scrape_images \
 
 ### Google Drive にもアップロード (任意)
 
+Image Scraper は2つの Google Drive アップロード方式をサポートしています：
+
+#### 方式1: rclone (推奨 - 個人 Drive 向け)
+
+**メリット**:
+- ✅ 個人 Google Drive が使える
+- ✅ 初回認証のみ（以降は認証不要）
+- ✅ サービスアカウント不要
+- ✅ コマンドラインでシンプル
+
+**セットアップ手順**:
+
+1. rclone をインストール:
+
+```zsh
+# macOS
+brew install rclone
+
+# Linux
+curl https://rclone.org/install.sh | sudo bash
+```
+
+2. rclone を設定:
+
+```zsh
+rclone config
+```
+
+設定手順:
+1. `n` - 新しいリモート作成
+2. Name: `gdrive`
+3. Storage: `18` (Google Drive)
+4. client_id: [Enter でスキップ]
+5. client_secret: [Enter でスキップ]
+6. scope: `1` (Full access)
+7. service_account_file: [Enter でスキップ]
+8. Edit advanced config: `n`
+9. Use web browser: `y`
+10. ブラウザで Google アカウント認証
+11. Configure as team drive: `n`
+12. Confirm: `y`
+13. Quit: `q`
+
+3. 動作確認:
+
+```zsh
+# Drive のフォルダ一覧を表示
+rclone lsd gdrive:
+
+# バックアップ用フォルダを作成（任意）
+rclone mkdir gdrive:n8n-backups
+```
+
+4. Python コードから利用:
+
+```python
+from src.lib.image_scraper import scrape_images
+from src.lib.drive_uploader import create_uploader
+
+# rclone uploader を作成
+uploader = create_uploader(method="rclone", rclone_remote="gdrive")
+
+# 画像をスクレイプして Drive にアップロード
+result = scrape_images(
+    url="https://example.com",
+    output_dir="./images",
+    drive_uploader=uploader,
+    drive_folder="n8n-backups"  # Drive 上のフォルダパス
+)
+```
+
+**自動セットアップスクリプト**:
+
+便利な自動セットアップスクリプトも利用できます：
+
+```zsh
+# scripts/setup_rclone.sh を実行
+chmod +x scripts/setup_rclone.sh
+./scripts/setup_rclone.sh
+```
+
+---
+
+#### 方式2: サービスアカウント (バックエンド自動化向け)
+
+**メリット**:
+- ✅ サーバー間認証に最適
+- ✅ ユーザー操作不要
+- ✅ 複数環境で利用可能
+
+**セットアップ手順**:
+
 1. Google Cloud Console でサービスアカウントとキー(JSON)を作成
 2. 対象フォルダIDを取得 (URLの `folders/<ID>` 部分)
 3. そのフォルダをサービスアカウントメールに共有
+4. Python コードから利用:
+
+```python
+from src.lib.image_scraper import scrape_images
+from src.lib.drive_uploader import create_uploader
+
+# Service account uploader を作成
+uploader = create_uploader(
+    method="service_account",
+    service_account_file="path/to/service_account.json"
+)
+
+# 画像をスクレイプして Drive にアップロード
+result = scrape_images(
+    url="https://example.com",
+    output_dir="./images",
+    drive_uploader=uploader,
+    drive_folder="your_folder_id"  # Drive フォルダ ID
+)
+```
+
+**CLI から利用** (レガシー互換):
 
 ```zsh
 export GDRIVE_SA_JSON=path/to/service_account.json
@@ -74,12 +188,6 @@ uv run python -m src.cli.scrape_images \
   --url https://example.com \
   --out images \
   --drive-folder-id <your_folder_id>
-# または明示指定
-uv run python -m src.cli.scrape_images \
-  --url https://example.com \
-  --out images \
-  --drive-folder-id <your_folder_id> \
-  --drive-sa-json path/to/service_account.json
 ```
 
 ## テスト実行
