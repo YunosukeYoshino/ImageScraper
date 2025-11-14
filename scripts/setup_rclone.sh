@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 ###############################################################################
 # rclone Setup Guide for Google Drive

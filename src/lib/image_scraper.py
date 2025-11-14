@@ -40,7 +40,7 @@ import re
 import time
 import mimetypes
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Callable, Union
+from typing import Iterable, List, Optional, Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 import hashlib
