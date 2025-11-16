@@ -76,7 +76,7 @@ try:
 except Exception:  # pragma: no cover - absence is acceptable
     _LEGACY_DRIVE_AVAILABLE = False
 
-logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
+logger = logging.getLogger(__name__)
 
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; ImageScraper/1.0; +https://github.com/example)",
@@ -102,7 +102,7 @@ def _request_with_retry(url: str, retries: int = 3, backoff: float = 1.2) -> req
             return resp
         except Exception as e:  # broad for retry
             last_exc = e
-            logging.warning(f"Attempt {attempt} failed for {url}: {e}")
+            logger.warning(f"Attempt {attempt} failed for {url}: {e}")
             if attempt < retries:
                 time.sleep(backoff * attempt)
     raise RuntimeError(f"Failed to fetch {url}: {last_exc}")
@@ -161,10 +161,10 @@ def _download_image(url: str, dest_dir: str) -> Optional[str]:
         filepath = os.path.join(dest_dir, filename)
         with open(filepath, "wb") as f:
             f.write(r.content)
-        logging.info(f"Saved {url} -> {filepath}")
+        logger.info(f"Saved {url} -> {filepath}")
         return filepath
     except Exception as e:
-        logging.error(f"Failed to download {url}: {e}")
+        logger.error(f"Failed to download {url}: {e}")
         return None
 
 
@@ -207,7 +207,7 @@ def _drive_upload(drive_service, local_path: str, parent_folder_id: Optional[str
     media = MediaFileUpload(local_path, resumable=True)
     created = drive_service.files().create(body=file_metadata, media_body=media, fields="id").execute()
     file_id = created.get("id")
-    logging.info(f"Uploaded to Drive (legacy): {local_path} -> {file_id}")
+    logger.info(f"Uploaded to Drive (legacy): {local_path} -> {file_id}")
     return file_id
 
 
@@ -283,7 +283,7 @@ def scrape_images(
 
     for img_url in normalized:
         if respect_robots and not _robots_allowed(img_url):
-            logging.warning(f"robots.txt disallows fetching image: {img_url}")
+            logger.warning(f"robots.txt disallows fetching image: {img_url}")
             continue
         local = _download_image(img_url, output_dir)
         if local:
@@ -295,14 +295,14 @@ def scrape_images(
                     file_id = _upload_to_drive(drive_uploader, local, drive_folder)
                     drive_ids.append(file_id)
                 except Exception as e:
-                    logging.error(f"Drive upload failed for {local}: {e}")
+                    logger.error(f"Drive upload failed for {local}: {e}")
             elif drive_service:
                 # Legacy path for backward compatibility
                 try:
                     file_id = _drive_upload(drive_service, local, parent_folder_id=drive_folder_id)
                     drive_ids.append(file_id)
                 except Exception as e:
-                    logging.error(f"Drive upload failed for {local}: {e}")
+                    logger.error(f"Drive upload failed for {local}: {e}")
 
     return ScrapeResult(page_url=url, image_urls=normalized, saved_files=saved_files, drive_file_ids=drive_ids)
 
@@ -367,6 +367,7 @@ def download_images(
 
     Example:
         # Modern usage with keyword-only parameters
+        from src.lib.drive_uploader import create_uploader
         uploader = create_uploader(method="rclone")
         files = download_images(
             urls,
@@ -382,7 +383,7 @@ def download_images(
     saved_files: List[str] = []
     for img_url in image_urls:
         if respect_robots and not _robots_allowed(img_url):
-            logging.warning(f"robots.txt disallows fetching image: {img_url}")
+            logger.warning(f"robots.txt disallows fetching image: {img_url}")
             continue
         local = _download_image(img_url, output_dir)
         if local:
@@ -393,13 +394,13 @@ def download_images(
                 try:
                     _ = _upload_to_drive(drive_uploader, local, drive_folder)
                 except Exception as e:
-                    logging.error(f"Drive upload failed for {local}: {e}")
+                    logger.error(f"Drive upload failed for {local}: {e}")
             elif drive_service:
                 # Legacy path for backward compatibility
                 try:
                     _ = _drive_upload(drive_service, local, parent_folder_id=drive_folder_id)
                 except Exception as e:
-                    logging.error(f"Drive upload failed for {local}: {e}")
+                    logger.error(f"Drive upload failed for {local}: {e}")
     return saved_files
 
 
@@ -422,7 +423,7 @@ def download_images_parallel(image_urls: List[str], output_dir: str, max_workers
 
     def _task(u: str) -> Optional[str]:
         if respect_robots and not _robots_allowed(u):
-            logging.warning(f"robots.txt disallows fetching image: {u}")
+            logger.warning(f"robots.txt disallows fetching image: {u}")
             return None
         return _download_image(u, output_dir)
 
@@ -433,7 +434,7 @@ def download_images_parallel(image_urls: List[str], output_dir: str, max_workers
             try:
                 res = fut.result()
             except Exception as e:  # pragma: no cover - defensive
-                logging.error(f"Parallel download failed: {e}")
+                logger.error(f"Parallel download failed: {e}")
             if res:
                 results.append(res)
             done += 1

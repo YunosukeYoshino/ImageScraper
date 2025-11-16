@@ -18,7 +18,7 @@ import subprocess
 from abc import ABC, abstractmethod
 from typing import Optional, List
 
-logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
+logger = logging.getLogger(__name__)
 
 
 class DriveUploader(ABC):
@@ -134,7 +134,7 @@ class ServiceAccountUploader(DriveUploader):
         ).execute()
 
         file_id = created.get("id")
-        logging.info(f"Uploaded via Service Account: {local_path} -> {file_id}")
+        logger.info(f"Uploaded via Service Account: {local_path} -> {file_id}")
         return file_id
 
     def is_available(self) -> bool:
@@ -218,17 +218,17 @@ class RcloneUploader(DriveUploader):
             )
 
             final_path = f"{remote_path}/{filename}" if remote_folder else f"{self.remote_name}:{filename}"
-            logging.info(f"Uploaded via rclone: {local_path} -> {final_path}")
+            logger.info(f"Uploaded via rclone: {local_path} -> {final_path}")
 
             # Log rclone output for debugging
             if result.stderr:
-                logging.debug(f"rclone stderr: {result.stderr}")
+                logger.debug(f"rclone stderr: {result.stderr}")
 
             return final_path
 
         except subprocess.CalledProcessError as e:
             error_msg = f"rclone upload failed: {e.stderr if e.stderr else str(e)}"
-            logging.error(error_msg)
+            logger.error(error_msg)
             raise RuntimeError(error_msg) from e
         except subprocess.TimeoutExpired as e:
             raise RuntimeError(f"rclone upload timeout after 300s") from e

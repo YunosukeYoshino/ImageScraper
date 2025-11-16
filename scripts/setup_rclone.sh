@@ -19,8 +19,20 @@ if command -v rclone &> /dev/null; then
     echo ""
 else
     echo "Installing rclone..."
-    curl https://rclone.org/install.sh | sudo bash
     echo ""
+    echo "WARNING: This will download and execute the official rclone install script with sudo."
+    echo "You can review the script at: https://rclone.org/install.sh"
+    echo ""
+    read -p "Continue? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        curl https://rclone.org/install.sh | sudo bash
+        echo ""
+    else
+        echo "rclone installation skipped."
+        echo "You can install rclone manually from: https://rclone.org/downloads/"
+        exit 0
+    fi
 fi
 
 echo "========================================="
