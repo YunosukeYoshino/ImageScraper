@@ -4,24 +4,45 @@ This module provides functions to:
 - Fetch an HTML page via requests with robust headers and retry logic.
 - Parse image URLs using BeautifulSoup and optional filtering.
 - Download images to a local directory with collision avoidance.
-- (Optional) Upload downloaded images to Google Drive using the Drive API.
+- (Optional) Upload downloaded images to Google Drive using pluggable strategies.
 
-Google Drive Upload Requires Authentication:
-- There is NO truly unauthenticated library for uploading to private Google Drive.
-- For automation, use one of:
-  * Service Account (preferred for backend jobs) + google-api-python-client
-  * OAuth user consent flow (pydrive2) if acting on a user's personal Drive
-  * rclone (manual one-time auth) then invoke shell commands to copy files
+Google Drive Upload Options:
+1. Service Account (google-api-python-client)
+   - Best for backend automation
+   - Requires service account JSON key
+   - Target folder must be shared with service account email
 
-If you only need to make images available publicly, consider using an object storage
-service (e.g., Cloud Storage, S3) or a shared Drive folder after authentication.
+2. rclone (command-line tool)
+   - Best for personal Drive accounts
+   - One-time OAuth authentication via browser
+   - No code-level credentials needed after setup
 
 Minimal usage example (local save only):
 
-from src.lib.image_scraper import scrape_images
-scrape_images("https://example.com", "downloaded_images")
+    from src.lib.image_scraper import scrape_images
+    scrape_images("https://example.com", "downloaded_images")
 
-To enable Drive upload you must first create credentials JSON and share a folder if using service account.
+With Google Drive upload (rclone) - note: drive_uploader is keyword-only:
+
+    from src.lib.drive_uploader import create_uploader
+    uploader = create_uploader(method="rclone")
+    scrape_images(
+        "https://example.com",
+        "images",
+        drive_uploader=uploader,  # keyword-only parameter
+        drive_folder="backups"
+    )
+
+With Google Drive upload (service account) - note: drive_uploader is keyword-only:
+
+    from src.lib.drive_uploader import create_uploader
+    uploader = create_uploader(method="service_account", service_account_file="key.json")
+    scrape_images(
+        "https://example.com",
+        "images",
+        drive_uploader=uploader,  # keyword-only parameter
+        drive_folder="folder_id"
+    )
 """
 from __future__ import annotations
 import os
@@ -39,15 +60,23 @@ from urllib import robotparser
 import requests
 from bs4 import BeautifulSoup
 
-# Optional import: wrap in try/except so local-only usage works.
+# Import the new DriveUploader abstraction
+try:
+    from src.lib.drive_uploader import DriveUploader
+    _UPLOADER_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    _UPLOADER_AVAILABLE = False
+    DriveUploader = None  # type: ignore
+
+# Legacy imports for backward compatibility
 try:
     from google.oauth2 import service_account
     from googleapiclient.discovery import build
-    _DRIVE_AVAILABLE = True
+    _LEGACY_DRIVE_AVAILABLE = True
 except Exception:  # pragma: no cover - absence is acceptable
-    _DRIVE_AVAILABLE = False
+    _LEGACY_DRIVE_AVAILABLE = False
 
-logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
+logger = logging.getLogger(__name__)
 
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; ImageScraper/1.0; +https://github.com/example)",
@@ -73,7 +102,7 @@ def _request_with_retry(url: str, retries: int = 3, backoff: float = 1.2) -> req
             return resp
         except Exception as e:  # broad for retry
             last_exc = e
-            logging.warning(f"Attempt {attempt} failed for {url}: {e}")
+            logger.warning(f"Attempt {attempt} failed for {url}: {e}")
             if attempt < retries:
                 time.sleep(backoff * attempt)
     raise RuntimeError(f"Failed to fetch {url}: {last_exc}")
@@ -132,15 +161,34 @@ def _download_image(url: str, dest_dir: str) -> Optional[str]:
         filepath = os.path.join(dest_dir, filename)
         with open(filepath, "wb") as f:
             f.write(r.content)
-        logging.info(f"Saved {url} -> {filepath}")
+        logger.info(f"Saved {url} -> {filepath}")
         return filepath
     except Exception as e:
-        logging.error(f"Failed to download {url}: {e}")
+        logger.error(f"Failed to download {url}: {e}")
         return None
 
 
+def _upload_to_drive(uploader: "DriveUploader", local_path: str, remote_folder: Optional[str] = None) -> str:
+    """Upload a file to Google Drive using the provided uploader strategy.
+
+    Args:
+        uploader: DriveUploader instance (ServiceAccountUploader or RcloneUploader)
+        local_path: Path to local file
+        remote_folder: Target folder (folder ID for service account, path for rclone)
+
+    Returns:
+        Identifier of uploaded file (file ID or remote path)
+    """
+    return uploader.upload_file(local_path, remote_folder)
+
+
+# Legacy functions - kept for backward compatibility but deprecated
 def _init_drive(service_account_file: str, scopes: Optional[List[str]] = None):
-    if not _DRIVE_AVAILABLE:
+    """DEPRECATED: Use create_uploader() from drive_uploader module instead.
+
+    This function is kept for backward compatibility with existing code.
+    """
+    if not _LEGACY_DRIVE_AVAILABLE:
         raise RuntimeError("google-api-python-client not available. Install google-api-python-client and google-auth.")
     scopes = scopes or ["https://www.googleapis.com/auth/drive.file"]
     creds = service_account.Credentials.from_service_account_file(service_account_file, scopes=scopes)
@@ -148,6 +196,10 @@ def _init_drive(service_account_file: str, scopes: Optional[List[str]] = None):
 
 
 def _drive_upload(drive_service, local_path: str, parent_folder_id: Optional[str] = None) -> str:
+    """DEPRECATED: Use DriveUploader.upload_file() instead.
+
+    This function is kept for backward compatibility with existing code.
+    """
     from googleapiclient.http import MediaFileUpload
     file_metadata = {"name": os.path.basename(local_path)}
     if parent_folder_id:
@@ -155,23 +207,49 @@ def _drive_upload(drive_service, local_path: str, parent_folder_id: Optional[str
     media = MediaFileUpload(local_path, resumable=True)
     created = drive_service.files().create(body=file_metadata, media_body=media, fields="id").execute()
     file_id = created.get("id")
-    logging.info(f"Uploaded to Drive: {local_path} -> {file_id}")
+    logger.info(f"Uploaded to Drive (legacy): {local_path} -> {file_id}")
     return file_id
 
 
-def scrape_images(url: str, output_dir: str, limit: Optional[int] = None, drive_service=None, drive_folder_id: Optional[str] = None, respect_robots: bool = True) -> ScrapeResult:
+def scrape_images(
+    url: str,
+    output_dir: str,
+    limit: Optional[int] = None,
+    drive_service=None,
+    drive_folder_id: Optional[str] = None,
+    respect_robots: bool = True,
+    *,  # All parameters after this are keyword-only
+    drive_uploader: Optional["DriveUploader"] = None,
+    drive_folder: Optional[str] = None,
+) -> ScrapeResult:
     """Scrape image sources from a page and optionally upload them to Google Drive.
 
     Args:
-        url: Page URL to scrape.
-        output_dir: Local directory to store images.
-        limit: Optional maximum number of images to process.
-        drive_service: Optional Google Drive service instance (authenticated) for upload.
-    drive_folder_id: Optional folder ID in Google Drive where images will be placed.
-    respect_robots: When True, abort if robots.txt disallows fetching the page.
+        url: Page URL to scrape
+        output_dir: Local directory to store images
+        limit: Optional maximum number of images to process
+        drive_service: (DEPRECATED) Legacy Google Drive service instance
+        drive_folder_id: (DEPRECATED) Legacy folder ID parameter
+        respect_robots: When True, abort if robots.txt disallows fetching the page
+        drive_uploader: (Keyword-only) DriveUploader instance for uploads (new interface)
+        drive_folder: (Keyword-only) Folder identifier (folder ID or path depending on uploader)
 
     Returns:
-        ScrapeResult with details of the operation.
+        ScrapeResult with details of the operation
+
+    Example:
+        # Modern usage with rclone (keyword-only parameters)
+        from src.lib.drive_uploader import create_uploader
+        uploader = create_uploader(method="rclone")
+        result = scrape_images(
+            "https://example.com",
+            "./images",
+            drive_uploader=uploader,
+            drive_folder="backups"
+        )
+
+        # Legacy positional usage still works
+        result = scrape_images("https://example.com", "./images", None, service, folder_id, True)
     """
     _ensure_dir(output_dir)
     if respect_robots and not _robots_allowed(url):
@@ -205,17 +283,26 @@ def scrape_images(url: str, output_dir: str, limit: Optional[int] = None, drive_
 
     for img_url in normalized:
         if respect_robots and not _robots_allowed(img_url):
-            logging.warning(f"robots.txt disallows fetching image: {img_url}")
+            logger.warning(f"robots.txt disallows fetching image: {img_url}")
             continue
         local = _download_image(img_url, output_dir)
         if local:
             saved_files.append(local)
-            if drive_service:
+
+            # Handle Drive upload with new interface (preferred) or legacy interface
+            if drive_uploader:
+                try:
+                    file_id = _upload_to_drive(drive_uploader, local, drive_folder)
+                    drive_ids.append(file_id)
+                except Exception as e:
+                    logger.error(f"Drive upload failed for {local}: {e}")
+            elif drive_service:
+                # Legacy path for backward compatibility
                 try:
                     file_id = _drive_upload(drive_service, local, parent_folder_id=drive_folder_id)
                     drive_ids.append(file_id)
                 except Exception as e:
-                    logging.error(f"Drive upload failed for {local}: {e}")
+                    logger.error(f"Drive upload failed for {local}: {e}")
 
     return ScrapeResult(page_url=url, image_urls=normalized, saved_files=saved_files, drive_file_ids=drive_ids)
 
@@ -254,22 +341,66 @@ def list_images(url: str, limit: Optional[int] = None, respect_robots: bool = Tr
     return normalized
 
 
-def download_images(image_urls: List[str], output_dir: str, drive_service=None, drive_folder_id: Optional[str] = None, respect_robots: bool = True) -> List[str]:
-    """Download provided image URLs to output_dir, optionally uploading to Drive. Returns list of saved file paths."""
+def download_images(
+    image_urls: List[str],
+    output_dir: str,
+    drive_service=None,
+    drive_folder_id: Optional[str] = None,
+    respect_robots: bool = True,
+    *,  # All parameters after this are keyword-only
+    drive_uploader: Optional["DriveUploader"] = None,
+    drive_folder: Optional[str] = None,
+) -> List[str]:
+    """Download provided image URLs to output_dir, optionally uploading to Drive.
+
+    Args:
+        image_urls: List of image URLs to download
+        output_dir: Local directory to save images
+        drive_service: (DEPRECATED) Legacy Google Drive service instance
+        drive_folder_id: (DEPRECATED) Legacy folder ID parameter
+        respect_robots: When True, skip images blocked by robots.txt
+        drive_uploader: (Keyword-only) DriveUploader instance for uploads (new interface)
+        drive_folder: (Keyword-only) Folder identifier (folder ID or path)
+
+    Returns:
+        List of saved file paths
+
+    Example:
+        # Modern usage with keyword-only parameters
+        from src.lib.drive_uploader import create_uploader
+        uploader = create_uploader(method="rclone")
+        files = download_images(
+            urls,
+            "./images",
+            drive_uploader=uploader,
+            drive_folder="backups"
+        )
+
+        # Legacy positional usage still works
+        files = download_images(urls, "./images", service, folder_id, True)
+    """
     _ensure_dir(output_dir)
     saved_files: List[str] = []
     for img_url in image_urls:
         if respect_robots and not _robots_allowed(img_url):
-            logging.warning(f"robots.txt disallows fetching image: {img_url}")
+            logger.warning(f"robots.txt disallows fetching image: {img_url}")
             continue
         local = _download_image(img_url, output_dir)
         if local:
             saved_files.append(local)
-            if drive_service:
+
+            # Handle Drive upload with new interface (preferred) or legacy interface
+            if drive_uploader:
+                try:
+                    _ = _upload_to_drive(drive_uploader, local, drive_folder)
+                except Exception as e:
+                    logger.error(f"Drive upload failed for {local}: {e}")
+            elif drive_service:
+                # Legacy path for backward compatibility
                 try:
                     _ = _drive_upload(drive_service, local, parent_folder_id=drive_folder_id)
                 except Exception as e:
-                    logging.error(f"Drive upload failed for {local}: {e}")
+                    logger.error(f"Drive upload failed for {local}: {e}")
     return saved_files
 
 
@@ -292,7 +423,7 @@ def download_images_parallel(image_urls: List[str], output_dir: str, max_workers
 
     def _task(u: str) -> Optional[str]:
         if respect_robots and not _robots_allowed(u):
-            logging.warning(f"robots.txt disallows fetching image: {u}")
+            logger.warning(f"robots.txt disallows fetching image: {u}")
             return None
         return _download_image(u, output_dir)
 
@@ -303,7 +434,7 @@ def download_images_parallel(image_urls: List[str], output_dir: str, max_workers
             try:
                 res = fut.result()
             except Exception as e:  # pragma: no cover - defensive
-                logging.error(f"Parallel download failed: {e}")
+                logger.error(f"Parallel download failed: {e}")
             if res:
                 results.append(res)
             done += 1
