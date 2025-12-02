@@ -137,6 +137,15 @@ def _robots_allowed(target_url: str, user_agent: str = DEFAULT_HEADERS["User-Age
         return True
 
 
+def robots_allowed(target_url: str, user_agent: str = DEFAULT_HEADERS["User-Agent"]) -> bool:
+    """Public wrapper to check robots.txt allowance for a given URL.
+
+    Exposed for reuse by other modules (e.g., topic discovery). Fails open
+    if robots.txt is unreachable.
+    """
+    return _robots_allowed(target_url, user_agent=user_agent)
+
+
 def _hash_name(url: str) -> str:
     h = hashlib.sha256(url.encode("utf-8")).hexdigest()[:16]
     ext = os.path.splitext(url.split("?")[0])[1] or ".img"
@@ -311,6 +320,7 @@ __all__ = [
     "scrape_images",
     "ScrapeResult",
     "_init_drive",
+    "robots_allowed",
 ]
 
 # -- New helpers for UI preview/selective download --

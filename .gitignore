@@ -51,3 +51,4 @@ node_modules/
 # Ignore uv build artifacts (if created)
 build/
 
+discovery_logs/

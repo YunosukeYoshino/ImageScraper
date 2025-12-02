@@ -62,6 +62,16 @@ uv run python -m src.cli.scrape_images \
   # 出力先はデフォルトで ./images に保存されます
 ```
 
+### トピック（検索ワード）からの自律探索プレビュー（MVP）
+
+```zsh
+uv run python -m src.cli.scrape_images \
+  --topic "富士山 紅葉" \
+  --limit 50
+```
+
+現時点ではプレビュー JSON（プロベナンス含む）の出力が中心です。順次、フィルタ・選択ダウンロードや複数トピック対応を追加します。
+
 ### Google Drive にもアップロード (任意)
 
 Image Scraper は2つの Google Drive アップロード方式をサポートしています：
