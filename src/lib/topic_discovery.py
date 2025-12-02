@@ -19,6 +19,12 @@ import re
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
+try:
+    from PIL import Image
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
+
 from .models_discovery import ProvenanceEntry, PreviewResult, QueryLogEntry, DownloadFilter
 from .image_scraper import robots_allowed, list_images, download_images_parallel, _hash_name
 from . import search_provider
@@ -190,6 +196,39 @@ def filter_entries(
     return filtered
 
 
+def _check_image_resolution(filepath: str, min_width: Optional[int], min_height: Optional[int]) -> bool:
+    """Check if image meets minimum resolution requirements.
+
+    Args:
+        filepath: Path to the image file.
+        min_width: Minimum width in pixels (None = no limit).
+        min_height: Minimum height in pixels (None = no limit).
+
+    Returns:
+        True if image meets requirements, False otherwise.
+    """
+    if not HAS_PIL:
+        logger.warning("PIL not available, skipping resolution check for %s", filepath)
+        return True
+
+    if min_width is None and min_height is None:
+        return True
+
+    try:
+        with Image.open(filepath) as img:
+            width, height = img.size
+            if min_width is not None and width < min_width:
+                logger.debug("resolution.reject width=%d < min_width=%d file=%s", width, min_width, filepath)
+                return False
+            if min_height is not None and height < min_height:
+                logger.debug("resolution.reject height=%d < min_height=%d file=%s", height, min_height, filepath)
+                return False
+            return True
+    except Exception as e:
+        logger.warning("resolution.check_failed file=%s err=%s", filepath, e)
+        return True  # Keep file on error (conservative approach)
+
+
 def download_selected(
     entries: List[ProvenanceEntry],
     output_dir: str,
@@ -232,6 +271,25 @@ def download_selected(
         respect_robots=respect_robots,
         progress_cb=progress_cb,
     )
+
+    # Apply resolution filter after download (FR-005)
+    min_width = download_filter.min_width if download_filter else None
+    min_height = download_filter.min_height if download_filter else None
+    if min_width is not None or min_height is not None:
+        files_before = len(saved_files)
+        filtered_files = []
+        for filepath in saved_files:
+            if _check_image_resolution(filepath, min_width, min_height):
+                filtered_files.append(filepath)
+            else:
+                # Remove file that doesn't meet resolution requirements
+                try:
+                    os.remove(filepath)
+                    logger.info("resolution.removed file=%s", filepath)
+                except OSError as e:
+                    logger.warning("resolution.remove_failed file=%s err=%s", filepath, e)
+        saved_files = filtered_files
+        logger.info("resolution_filter applied=%d removed=%d", files_before, files_before - len(saved_files))
 
     # Build provenance index mapping filename -> provenance
     # Clean Architecture: 実際に保存されたファイルから逆マッピングして正確なファイル名を取得

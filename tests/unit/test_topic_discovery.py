@@ -272,5 +272,78 @@ class TestDownloadSelected(unittest.TestCase):
             self.assertEqual(index_data["total"], 0)
 
 
+class TestResolutionFilter(unittest.TestCase):
+    """Test resolution filtering (min_width/min_height) in download_selected."""
+
+    def _make_entry(self, image_url: str) -> ProvenanceEntry:
+        return ProvenanceEntry(
+            topic="test",
+            source_page_url="https://example.com/",
+            image_url=image_url,
+            discovery_method="SERP",
+        )
+
+    @patch("src.lib.topic_discovery._check_image_resolution")
+    @patch("src.lib.topic_discovery.download_images_parallel")
+    def test_resolution_filter_removes_small_images(self, mock_download, mock_check):
+        """Test that images not meeting resolution requirements are removed."""
+        import hashlib
+
+        url1 = "https://example.com/large.jpg"
+        url2 = "https://example.com/small.jpg"
+        entries = [
+            self._make_entry(url1),
+            self._make_entry(url2),
+        ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            hash1 = hashlib.sha256(url1.encode("utf-8")).hexdigest()[:16]
+            hash2 = hashlib.sha256(url2.encode("utf-8")).hexdigest()[:16]
+            file1 = os.path.join(tmpdir, f"{hash1}.jpg")
+            file2 = os.path.join(tmpdir, f"{hash2}.jpg")
+
+            # Mock download returns both files
+            mock_download.return_value = [file1, file2]
+
+            # Create fake files
+            for p in [file1, file2]:
+                with open(p, "wb") as f:
+                    f.write(b"fake")
+
+            # Mock resolution check: first passes, second fails
+            mock_check.side_effect = [True, False]
+
+            flt = DownloadFilter(min_width=800, min_height=600)
+            saved, index_path = download_selected(entries, tmpdir, download_filter=flt)
+
+            # Only large image should remain
+            self.assertEqual(len(saved), 1)
+            self.assertEqual(saved[0], file1)
+
+            # Small image file should be removed
+            self.assertFalse(os.path.exists(file2))
+
+    @patch("src.lib.topic_discovery.download_images_parallel")
+    def test_no_resolution_filter_keeps_all(self, mock_download):
+        """Test that without resolution filter, all images are kept."""
+        import hashlib
+
+        url1 = "https://example.com/img1.jpg"
+        entries = [self._make_entry(url1)]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            hash1 = hashlib.sha256(url1.encode("utf-8")).hexdigest()[:16]
+            file1 = os.path.join(tmpdir, f"{hash1}.jpg")
+
+            mock_download.return_value = [file1]
+
+            with open(file1, "wb") as f:
+                f.write(b"fake")
+
+            # No filter - should keep all
+            saved, _ = download_selected(entries, tmpdir)
+            self.assertEqual(len(saved), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
