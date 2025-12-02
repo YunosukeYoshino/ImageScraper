@@ -121,7 +121,7 @@ uv run python -m unittest tests.unit.test_api.TestAPI.test_healthz
 5. CLIラッパーとライブラリ関数の両方を公開
 
 ### Streamlit UI Conventions
-- 5カラムグリッド、`use_container_width=True`（`use_column_width`は非推奨）
+- 5カラムグリッド、`width="stretch"`（`use_container_width`は非推奨）
 - フロー: URLプレビュー → 選択 → 並列ダウンロード → ZIPダウンロード
 - robots.txt尊重を徹底
 

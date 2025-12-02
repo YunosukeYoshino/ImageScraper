@@ -57,7 +57,7 @@ uv run python -m unittest discover -s tests/unit
 - CLI は非対話的に保ち、プロンプトではなくフラグを追加する。出力先はデフォルトで ./images。
 - 資格情報はコミットしない。環境変数（`GDRIVE_SA_JSON`）または CLI フラグで参照。
 - 新しい連携を追加する場合は、ライブラリ関数と CLI ラッパーの両方を公開。
-- UI 規約: Streamlit は 5 カラムグリッド、`use_container_width` を使用（`use_column_width` は非推奨）。「URL プレビュー → 選択 → 並列ダウンロード → ZIP ダウンロード」の流れ。robots.txt を尊重。
+- UI 規約: Streamlit は 5 カラムグリッド、`width="stretch"` を使用（`use_container_width` は非推奨）。「URL プレビュー → 選択 → 並列ダウンロード → ZIP ダウンロード」の流れ。robots.txt を尊重。
 
 ## 不明な場合
 

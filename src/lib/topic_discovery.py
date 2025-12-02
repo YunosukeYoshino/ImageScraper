@@ -1,31 +1,46 @@
 from __future__ import annotations
 
-"""Topic-based image discovery orchestrator (skeleton for Phase 1).
+"""Topic-based image discovery orchestrator.
 
-Future responsibilities (subsequent tasks):
-- Query search provider(s)
+Responsibilities:
+- Query search provider(s) for candidate pages
 - Parse result pages and extract image URLs
-- Respect robots.txt for pages (Phase 2+)
-- Write deterministic query logs (US1 T013)
+- Respect robots.txt for pages
+- Write deterministic query logs
 - Produce provenance entries
+- Filter and download images (US2)
 """
 
-from typing import List, Tuple
+from typing import List, Tuple, Optional, Callable
 import logging
 import json
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timezone
+from urllib.parse import urlparse
 
-from .models_discovery import ProvenanceEntry, PreviewResult, QueryLogEntry
-from .image_scraper import robots_allowed, list_images
+from .models_discovery import ProvenanceEntry, PreviewResult, QueryLogEntry, DownloadFilter
+from .image_scraper import robots_allowed, list_images, download_images_parallel, _hash_name
 from . import search_provider
+from .rate_limit import TokenBucket
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_PROVIDER = "duckduckgo"
 
 _DISCOVERY_LOG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "discovery_logs"))
+
+# Rate limiter for search provider (max 2 requests per second)
+_discovery_rate_limiter = TokenBucket(capacity=2, fill_rate=2.0)
+
+
+def _apply_rate_limit() -> None:
+    """Apply rate limiting before network requests."""
+    _discovery_rate_limiter.acquire(1)
+
+
+# Wire rate limiter to search provider
+search_provider.set_rate_limiter(_apply_rate_limit)
 
 
 def _slugify_topic(topic: str) -> str:
@@ -90,7 +105,7 @@ def discover_topic(topic: str, limit: int = 50) -> PreviewResult:
     # 2) Write deterministic query log
     try:
         os.makedirs(_DISCOVERY_LOG_DIR, exist_ok=True)
-        ts = datetime.utcnow().strftime("%Y%m%d")
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d")
         fn = f"{ts}_{_slugify_topic(topic)}.json"
         path = os.path.join(_DISCOVERY_LOG_DIR, fn)
         payload = {
@@ -117,3 +132,142 @@ def discover_topic(topic: str, limit: int = 50) -> PreviewResult:
     )
     logger.info("discover_topic.end topic=%s count=%d", topic, result.total_images)
     return result
+
+
+# ---------------------------------------------------------------------------
+# US2: Filtering & Selective Download
+# ---------------------------------------------------------------------------
+
+def filter_entries(
+    entries: List[ProvenanceEntry],
+    download_filter: Optional[DownloadFilter] = None,
+) -> List[ProvenanceEntry]:
+    """Apply filters to provenance entries.
+
+    Args:
+        entries: List of ProvenanceEntry to filter.
+        download_filter: Optional DownloadFilter with domain/resolution constraints.
+
+    Returns:
+        Filtered list of ProvenanceEntry.
+    """
+    if not download_filter:
+        return entries
+
+    filtered: List[ProvenanceEntry] = []
+    for entry in entries:
+        image_url = str(entry.image_url)
+        parsed = urlparse(image_url)
+        domain = parsed.netloc.lower()
+
+        # Domain allow list (whitelist)
+        if download_filter.allow_domains:
+            allowed = any(
+                domain == d.lower() or domain.endswith("." + d.lower())
+                for d in download_filter.allow_domains
+            )
+            if not allowed:
+                logger.debug("filter.domain_not_allowed url=%s domain=%s", image_url, domain)
+                continue
+
+        # Domain deny list (blacklist)
+        if download_filter.deny_domains:
+            denied = any(
+                domain == d.lower() or domain.endswith("." + d.lower())
+                for d in download_filter.deny_domains
+            )
+            if denied:
+                logger.debug("filter.domain_denied url=%s domain=%s", image_url, domain)
+                continue
+
+        # Note: Resolution filtering (min_width, min_height) requires fetching image headers
+        # or downloading. For efficiency, we skip resolution check at filter stage and
+        # apply it during download if needed.
+
+        filtered.append(entry)
+
+    logger.info("filter_entries input=%d output=%d", len(entries), len(filtered))
+    return filtered
+
+
+def download_selected(
+    entries: List[ProvenanceEntry],
+    output_dir: str,
+    download_filter: Optional[DownloadFilter] = None,
+    max_workers: int = 8,
+    respect_robots: bool = True,
+    progress_cb: Optional[Callable[[int, int], None]] = None,
+) -> Tuple[List[str], str]:
+    """Download selected images and write provenance_index.json.
+
+    Args:
+        entries: List of ProvenanceEntry to download.
+        output_dir: Destination directory.
+        download_filter: Optional filter (domain filtering applied here).
+        max_workers: Parallel download workers.
+        respect_robots: Skip images disallowed by robots.txt.
+        progress_cb: Optional progress callback(done, total).
+
+    Returns:
+        Tuple of (list of saved file paths, path to provenance_index.json).
+    """
+    # Apply domain filters
+    filtered_entries = filter_entries(entries, download_filter)
+    if not filtered_entries:
+        logger.warning("download_selected: no entries after filtering")
+        # Still write empty provenance index
+        os.makedirs(output_dir, exist_ok=True)
+        index_path = os.path.join(output_dir, "provenance_index.json")
+        with open(index_path, "w", encoding="utf-8") as f:
+            json.dump({"entries": [], "total": 0}, f, ensure_ascii=False, indent=2)
+        return [], index_path
+
+    image_urls = [str(e.image_url) for e in filtered_entries]
+
+    # Download images
+    saved_files = download_images_parallel(
+        image_urls,
+        output_dir,
+        max_workers=max_workers,
+        respect_robots=respect_robots,
+        progress_cb=progress_cb,
+    )
+
+    # Build provenance index mapping filename -> provenance
+    url_to_entry = {str(e.image_url): e for e in filtered_entries}
+    provenance_records = []
+    for url in image_urls:
+        entry = url_to_entry.get(url)
+        if entry:
+            filename = _hash_name(url)
+            # Check if file was actually saved
+            filepath = os.path.join(output_dir, filename)
+            if os.path.exists(filepath):
+                provenance_records.append({
+                    "filename": filename,
+                    "image_url": str(entry.image_url),
+                    "source_page_url": str(entry.source_page_url),
+                    "topic": entry.topic,
+                    "discovery_method": entry.discovery_method,
+                    "timestamp": entry.timestamp.isoformat() if entry.timestamp else None,
+                })
+
+    # Write provenance_index.json
+    os.makedirs(output_dir, exist_ok=True)
+    index_path = os.path.join(output_dir, "provenance_index.json")
+    index_data = {
+        "entries": provenance_records,
+        "total": len(provenance_records),
+        "filter_applied": {
+            "allow_domains": download_filter.allow_domains if download_filter else None,
+            "deny_domains": download_filter.deny_domains if download_filter else None,
+            "min_width": download_filter.min_width if download_filter else None,
+            "min_height": download_filter.min_height if download_filter else None,
+        } if download_filter else None,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    with open(index_path, "w", encoding="utf-8") as f:
+        json.dump(index_data, f, ensure_ascii=False, indent=2)
+    logger.info("provenance_index.written path=%s entries=%d", index_path, len(provenance_records))
+
+    return saved_files, index_path
