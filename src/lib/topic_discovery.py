@@ -234,23 +234,38 @@ def download_selected(
     )
 
     # Build provenance index mapping filename -> provenance
+    # Clean Architecture: 実際に保存されたファイルから逆マッピングして正確なファイル名を取得
     url_to_entry = {str(e.image_url): e for e in filtered_entries}
+
+    # URL hash -> URL のマッピングを作成（堅牢な逆参照のため）
+    import hashlib
+    url_hash_to_url = {
+        hashlib.sha256(url.encode("utf-8")).hexdigest()[:16]: url
+        for url in image_urls
+    }
+
     provenance_records = []
-    for url in image_urls:
-        entry = url_to_entry.get(url)
+    for saved_path in saved_files:
+        filename = os.path.basename(saved_path)
+        # ファイル名から拡張子を除いたハッシュ部分を取得
+        file_hash = os.path.splitext(filename)[0]
+
+        # ハッシュから元のURLを取得
+        original_url = url_hash_to_url.get(file_hash)
+        if not original_url:
+            logger.warning("provenance: hash not found for file=%s", filename)
+            continue
+
+        entry = url_to_entry.get(original_url)
         if entry:
-            filename = _hash_name(url)
-            # Check if file was actually saved
-            filepath = os.path.join(output_dir, filename)
-            if os.path.exists(filepath):
-                provenance_records.append({
-                    "filename": filename,
-                    "image_url": str(entry.image_url),
-                    "source_page_url": str(entry.source_page_url),
-                    "topic": entry.topic,
-                    "discovery_method": entry.discovery_method,
-                    "timestamp": entry.timestamp.isoformat() if entry.timestamp else None,
-                })
+            provenance_records.append({
+                "filename": filename,
+                "image_url": str(entry.image_url),
+                "source_page_url": str(entry.source_page_url),
+                "topic": entry.topic,
+                "discovery_method": entry.discovery_method,
+                "timestamp": entry.timestamp.isoformat() if entry.timestamp else None,
+            })
 
     # Write provenance_index.json
     os.makedirs(output_dir, exist_ok=True)

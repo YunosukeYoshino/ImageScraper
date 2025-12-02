@@ -1,17 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import List, Optional
 
-try:
-    from pydantic import BaseModel, Field, HttpUrl
-except Exception:  # pydantic might be optional in runtime; fallback lightweight typing
-    class BaseModel:  # type: ignore
-        pass
-    def Field(default=None, **kwargs):  # type: ignore
-        return default
-    HttpUrl = str  # type: ignore
+from pydantic import BaseModel, Field, HttpUrl
 
 
 class ProvenanceEntry(BaseModel):
@@ -47,14 +39,5 @@ class PreviewResult(BaseModel):
     query_log: QueryLogEntry
 
     def to_dict(self) -> dict:
-        # Pydantic BaseModel has .model_dump(); fallback to manual
-        try:
-            return self.model_dump()
-        except Exception:
-            return {
-                "topic": self.topic,
-                "entries": [e.__dict__ for e in self.entries],
-                "total_images": self.total_images,
-                "provider": self.provider,
-                "query_log": self.query_log.__dict__,
-            }
+        """Convert to dictionary using Pydantic's model_dump method."""
+        return self.model_dump()

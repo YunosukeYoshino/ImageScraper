@@ -98,7 +98,7 @@ def main() -> None:
                 },
             }, ensure_ascii=False))
         else:
-            # US1: Preview only
+            # US1: Preview only - プロベナンス情報を完全に出力
             print(json.dumps({
                 "mode": "topic_preview",
                 "topic": ns.topic,
@@ -108,9 +108,11 @@ def main() -> None:
                 "image_count": preview.query_log.image_count,
                 "entries": [
                     {
+                        "topic": e.topic,
                         "image_url": str(e.image_url),
                         "source_page_url": str(e.source_page_url),
                         "discovery_method": e.discovery_method,
+                        "timestamp": e.timestamp.isoformat() if e.timestamp else None,
                     } for e in preview.entries
                 ],
             }, ensure_ascii=False))

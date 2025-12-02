@@ -201,16 +201,24 @@ class TestDownloadSelected(unittest.TestCase):
     @patch("src.lib.topic_discovery.download_images_parallel")
     def test_download_selected_creates_provenance_index(self, mock_download):
         """Test that provenance_index.json is created."""
+        import hashlib
+
+        url1 = "https://example.com/img1.jpg"
+        url2 = "https://example.com/img2.jpg"
         entries = [
-            self._make_entry("https://example.com/img1.jpg"),
-            self._make_entry("https://example.com/img2.jpg"),
+            self._make_entry(url1),
+            self._make_entry(url2),
         ]
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Mock download to return fake file paths
+            # Generate correct hash-based filenames
+            hash1 = hashlib.sha256(url1.encode("utf-8")).hexdigest()[:16]
+            hash2 = hashlib.sha256(url2.encode("utf-8")).hexdigest()[:16]
+
+            # Mock download to return fake file paths with correct hash names
             mock_download.return_value = [
-                os.path.join(tmpdir, "abc123.jpg"),
-                os.path.join(tmpdir, "def456.jpg"),
+                os.path.join(tmpdir, f"{hash1}.jpg"),
+                os.path.join(tmpdir, f"{hash2}.jpg"),
             ]
             # Create fake files so provenance check passes
             for p in mock_download.return_value:

@@ -136,7 +136,7 @@ if preview_urls:
         col = cols[idx_global % 5]
         u_str = str(u)
         with col:
-            st.image(u_str, caption=Path(u_str).name, width="stretch")
+            st.image(u_str, caption=Path(u_str).name, use_column_width=True)
             key = f"sel_{preview_urls.index(u)}"
             checked = st.checkbox("選択", key=key, value=(u_str in selected))
             if checked:
@@ -207,7 +207,7 @@ if preview_urls:
                         grid = st.columns(5)
                         for i, p in enumerate(paths[:20]):  # Show max 20 thumbnails
                             with grid[i % 5]:
-                                st.image(p, caption="✅ " + Path(p).name, width="stretch")
+                                st.image(p, caption="✅ " + Path(p).name, use_column_width=True)
 
                         # Offer ZIP download to user
                         import io, zipfile
