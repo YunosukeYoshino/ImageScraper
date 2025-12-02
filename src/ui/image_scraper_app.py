@@ -13,16 +13,17 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from src.lib.image_scraper import scrape_images
+from src.lib.topic_discovery import discover_topic
 from src.lib import image_scraper as scraper
 
 
 st.set_page_config(page_title="image-saver | 画像スクレイパー", layout="centered")
 
-st.title("URLを入れるだけ・画像スクレイパー")
-st.caption("対象URLを入力してプレビュー → "
-           "必要なら選択してダウンロード。 robots.txt を尊重します。")
+st.title("URL/トピックで画像スクレイパー")
+st.caption("URLプレビュー → 選択ダウンロード、またはトピック（検索ワード）から自律探索プレビュー。robots.txt を尊重します。")
 
 url = st.text_input("対象URL", placeholder="https://example.com")
+topic = st.text_input("トピック（検索ワード）", placeholder="例: 富士山 紅葉", help="URLの代わりにトピックを入力してプレビュー")
 output_dir = st.text_input("保存先ディレクトリ", value="./images")
 limit = st.number_input("最大枚数(任意)", min_value=0, max_value=500, value=0, help="0は上限なし")
 respect_robots = st.toggle("robots.txt を尊重", value=True)
@@ -32,9 +33,12 @@ select_all_toggle = st.checkbox("全選択/全解除", value=False)
 
 col_r1, col_r2, col_r3 = st.columns([1,1,2])
 with col_r1:
-    run_preview = st.button("画像を取得（プレビュー）")
+    run_preview = st.button("URLプレビュー")
 with col_r2:
     clear_sel = st.button("選択をクリア")
+col_r4 = st.container()
+with col_r4:
+    run_topic = st.button("トピックでプレビュー")
 
 if clear_sel:
     st.session_state.pop("preview_urls", None)
@@ -50,9 +54,23 @@ if run_preview:
                 urls = scraper.list_images(url.strip(), limit=lim, respect_robots=respect_robots)
                 st.session_state["preview_urls"] = urls
                 st.session_state["selected"] = set()
-                st.success(f"検出: {len(urls)} 枚の画像候補")
+                st.success(f"検出: {len(urls)} 枚の画像候補 (URL)")
             except PermissionError as e:
                 st.warning(f"robots.txt によりブロックされました: {e}")
+            except Exception as e:
+                st.error(f"失敗しました: {e}")
+
+if run_topic:
+    if not topic.strip():
+        st.error("トピックを入力してください。")
+    else:
+        with st.spinner("トピックから探索中..."):
+            try:
+                lim: Optional[int] = None if limit == 0 else int(limit)
+                preview = discover_topic(topic.strip(), limit=lim or 50)
+                st.session_state["preview_urls"] = [e.image_url for e in preview.entries]
+                st.session_state["selected"] = set()
+                st.success(f"検出: {preview.total_images} 枚の画像候補 (トピック)")
             except Exception as e:
                 st.error(f"失敗しました: {e}")
 
