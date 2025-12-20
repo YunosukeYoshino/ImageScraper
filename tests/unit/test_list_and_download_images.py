@@ -1,5 +1,6 @@
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from src.lib import image_scraper as mod
 
@@ -17,7 +18,9 @@ class DummyResp:
 
 
 class TestListAndDownloadImages(unittest.TestCase):
-    def test_list_images_returns_normalized_urls(self):
+    @mock.patch.object(mod, '_request_with_retry')
+    def test_list_images_正規化されたURLを返す(self, mock_request: mock.Mock):
+        # Arrange
         html = """
         <html><body>
           <img src="/a.jpg">
@@ -26,49 +29,54 @@ class TestListAndDownloadImages(unittest.TestCase):
           <img src="/b.svg">
         </body></html>
         """
-        def fake_request_with_retry(url: str, retries: int = 3, backoff: float = 1.2):
-            return DummyResp(html)
+        mock_request.return_value = DummyResp(html)
 
-        old = mod._request_with_retry
-        mod._request_with_retry = fake_request_with_retry
-        try:
-            urls = mod.list_images("https://example.com/page", respect_robots=False)
-        finally:
-            mod._request_with_retry = old
+        # Act
+        urls = mod.list_images("https://example.com/page", respect_robots=False)
+
+        # Assert
         self.assertEqual(len(urls), 3)
         self.assertIn("https://cdn.example.com/x.png?v=2", urls)
+        self.assertIn("https://example.com/a.jpg", urls)
+        self.assertIn("https://example.com/b.svg", urls)
+        mock_request.assert_called_once_with("https://example.com/page")
 
-    def test_download_images_uses_downloader_and_respects_robots(self):
-        # Prepare 3 fake urls
+    @mock.patch.object(mod, '_robots_allowed')
+    @mock.patch.object(mod, '_download_image')
+    def test_download_images_robots_txtで禁止されたURLをスキップする(
+        self,
+        mock_download: mock.Mock,
+        mock_robots: mock.Mock
+    ):
+        # Arrange
         urls = [
             "https://example.com/a.jpg",
-            "https://example.com/b.png",
+            "https://example.com/b.png",  # このURLはrobots.txtでブロックされる
             "https://example.com/c.svg",
         ]
-        saved = []
+        saved_paths = []
 
         def fake_download(url: str, dest_dir: str):
             p = Path(dest_dir) / ("file_" + Path(url).suffix)
-            saved.append(str(p))
+            saved_paths.append(str(p))
             return str(p)
 
         def fake_robots(url: str, user_agent: str = mod.DEFAULT_HEADERS["User-Agent"]):
-            # block the second url
+            # 2番目のURL (b.png) をブロック
             return not url.endswith("b.png")
 
-        old_dl = mod._download_image
-        old_robot = mod._robots_allowed
-        mod._download_image = fake_download
-        mod._robots_allowed = fake_robots
-        try:
-            out = mod.download_images(urls, "./.tmp_test_out")
-        finally:
-            mod._download_image = old_dl
-            mod._robots_allowed = old_robot
+        mock_download.side_effect = fake_download
+        mock_robots.side_effect = fake_robots
 
-        # second url should be skipped by robots
+        # Act
+        out = mod.download_images(urls, "./.tmp_test_out")
+
+        # Assert
+        # 2番目のURLはrobots.txtでスキップされるため、2つのみダウンロード
         self.assertEqual(len(out), 2)
-        self.assertTrue(all(s.endswith(('.jpg', '.png', '.svg', '.bin')) for s in saved))
+        self.assertEqual(mock_download.call_count, 2)
+        self.assertEqual(mock_robots.call_count, 3)  # 全URLに対してチェック
+        self.assertTrue(all(s.endswith(('.jpg', '.png', '.svg', '.bin')) for s in saved_paths))
 
 
 if __name__ == "__main__":

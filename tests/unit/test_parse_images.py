@@ -1,5 +1,5 @@
-import types
 import unittest
+from unittest import mock
 
 from src.lib import image_scraper as mod
 
@@ -17,7 +17,9 @@ class DummyResp:
 
 
 class TestParseImages(unittest.TestCase):
-    def test_extracts_and_normalizes_img_src(self):
+    @mock.patch.object(mod, '_request_with_retry')
+    def test_画像URLを抽出し正規化する(self, mock_request):
+        # Arrange
         html = """
         <html><head><title>t</title></head>
         <body>
@@ -27,20 +29,21 @@ class TestParseImages(unittest.TestCase):
           <img src="/icons/icon.svg">
         </body></html>
         """
-        # Monkeypatch network fetch
-        def fake_request_with_retry(url: str, retries: int = 3, backoff: float = 1.2):
-            return DummyResp(html)
+        mock_request.return_value = DummyResp(html)
 
-        old_fn = mod._request_with_retry
-        mod._request_with_retry = fake_request_with_retry
-        try:
-            res = mod.scrape_images("https://example.com/page", "./.tmp_test_out", limit=None, respect_robots=False)
-        finally:
-            mod._request_with_retry = old_fn
+        # Act
+        res = mod.scrape_images(
+            "https://example.com/page",
+            "./.tmp_test_out",
+            limit=None,
+            respect_robots=False
+        )
+
+        # Assert
         self.assertEqual(res.page_url, "https://example.com/page")
-        # Should include 3 image URLs (filtering out non-image .txt)
+        # 非画像の.txtを除外して3つの画像URLを含む
         self.assertEqual(len(res.image_urls), 3)
-        # Ensure normalization and protocol for // links
+        # //で始まるリンクのプロトコル正規化を確認
         self.assertIn("https://cdn.example.com/x.png?v=1", res.image_urls)
 
 

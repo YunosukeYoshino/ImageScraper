@@ -1,6 +1,6 @@
 import os
 import json
-import time
+import tempfile
 from pathlib import Path
 import unittest
 
@@ -16,63 +16,113 @@ from src.lib.ui_helpers import (
 
 class TestUiHelpers(unittest.TestCase):
     def setUp(self):
-        # use temp config dir override
-        self.tmpdir = Path("./.tmp-test-config")
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.tmpdir = Path(self._tmpdir.name)
         os.environ["IMAGE_SAVER_CONFIG_DIR"] = str(self.tmpdir)
-        if self.tmpdir.exists():
-            for f in self.tmpdir.glob("*"):
-                f.unlink()
-        else:
-            self.tmpdir.mkdir(parents=True)
 
     def tearDown(self):
-        for f in self.tmpdir.glob("*"):
-            f.unlink()
-        self.tmpdir.rmdir()
         os.environ.pop("IMAGE_SAVER_CONFIG_DIR", None)
+        self._tmpdir.cleanup()
 
-    def test_validate_json_text(self):
-        ok, err = validate_json_text("")
+    def test_空文字列を検証するとエラーなしで成功する(self):
+        # Arrange
+        text = ""
+
+        # Act
+        ok, err = validate_json_text(text)
+
+        # Assert
         self.assertTrue(ok)
         self.assertIsNone(err)
-        ok, err = validate_json_text("{\n  \"a\": 1\n}")
+
+    def test_正しいJSON文字列を検証するとエラーなしで成功する(self):
+        # Arrange
+        text = "{\n  \"a\": 1\n}"
+
+        # Act
+        ok, err = validate_json_text(text)
+
+        # Assert
         self.assertTrue(ok)
         self.assertIsNone(err)
-        ok, err = validate_json_text("{bad")
+
+    def test_不正なJSON文字列を検証するとエラーが返る(self):
+        # Arrange
+        text = "{bad"
+
+        # Act
+        ok, err = validate_json_text(text)
+
+        # Assert
         self.assertFalse(ok)
         self.assertIsNotNone(err)
 
-    def test_mask_headers(self):
+    def test_機密情報を含むヘッダーがマスクされる(self):
+        # Arrange
         headers = {"Authorization": "Bearer 123", "X-Test": "ok", "Api-Key": "secret"}
+
+        # Act
         masked = mask_headers(headers)
+
+        # Assert
         self.assertEqual(masked["Authorization"], "***")
         self.assertEqual(masked["Api-Key"], "***")
         self.assertEqual(masked["X-Test"], "ok")
 
-    def test_build_full_url(self):
-        url = build_full_url("https://example.com/", "api", {"q": "x y", "tags": [1, 2]})
+    def test_ベースURLとパスとクエリパラメータから完全なURLが構築される(self):
+        # Arrange
+        base_url = "https://example.com/"
+        path = "api"
+        params = {"q": "x y", "tags": [1, 2]}
+
+        # Act
+        url = build_full_url(base_url, path, params)
+
+        # Assert
         self.assertTrue(url.startswith("https://example.com/api?"))
         self.assertIn("q=x+y", url)
         self.assertIn("tags=1", url)
         self.assertIn("tags=2", url)
 
-    def test_config_roundtrip(self):
+    def test_設定を保存して読み込むと元の設定が復元される(self):
+        # Arrange
         cfg = {"base_url": "http://localhost:8000", "recent": ["/healthz"]}
+
+        # Act
         save_config(cfg)
         loaded = load_config()
+
+        # Assert
         self.assertEqual(cfg, loaded)
 
-    def test_summarize_response(self):
+    def test_JSONレスポンスがサマリーとして整形される(self):
+        # Arrange
         text = json.dumps({"hello": "world"})
-        summary = summarize_response(200, 123, text, "application/json")
+        status = 200
+        elapsed_ms = 123
+        content_type = "application/json"
+
+        # Act
+        summary = summarize_response(status, elapsed_ms, text, content_type)
+
+        # Assert
         self.assertEqual(summary["status"], 200)
         self.assertEqual(summary["body_type"], "json")
         self.assertIn("hello", summary["body_preview"])
-        # Large body truncation
+
+    def test_大きなレスポンスボディがトランケートされる(self):
+        # Arrange
         big = "x" * 9000
-        summary_big = summarize_response(200, 50, big, "text/plain")
-        self.assertEqual(summary_big["body_type"], "text")
-        self.assertTrue(summary_big["body_preview"].endswith("(truncated)"))
+        status = 200
+        elapsed_ms = 50
+        content_type = "text/plain"
+
+        # Act
+        summary = summarize_response(status, elapsed_ms, big, content_type)
+
+        # Assert
+        self.assertEqual(summary["body_type"], "text")
+        self.assertTrue(summary["body_preview"].endswith("(truncated)"))
 
 
 if __name__ == "__main__":
