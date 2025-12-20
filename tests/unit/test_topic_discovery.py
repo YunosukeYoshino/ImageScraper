@@ -11,21 +11,27 @@ from src.lib.topic_discovery import (
     _DISCOVERY_LOG_DIR,
 )
 from src.lib.models_discovery import PreviewResult, ProvenanceEntry, DownloadFilter
+from src.lib.image_scraper import ImageMetadata
 
 
 class TestTopicDiscovery(unittest.TestCase):
     """Test topic discovery orchestrator with mocked search provider."""
 
     @patch("src.lib.topic_discovery.search_provider.search_pages")
-    @patch("src.lib.topic_discovery.list_images")
+    @patch("src.lib.topic_discovery.list_images_with_metadata")
     @patch("src.lib.topic_discovery.robots_allowed")
     def test_discover_topic_with_mocked_provider(self, mock_robots, mock_list, mock_search):
         """Test that discover_topic collects images from search results."""
         mock_search.return_value = ["https://example.com/page1", "https://example.com/page2"]
         mock_robots.return_value = True
         mock_list.side_effect = [
-            ["https://example.com/img1.jpg", "https://example.com/img2.jpg"],
-            ["https://example.com/img3.jpg"],
+            [
+                ImageMetadata(url="https://example.com/img1.jpg", alt="test topic image", context=None),
+                ImageMetadata(url="https://example.com/img2.jpg", alt=None, context=None),
+            ],
+            [
+                ImageMetadata(url="https://example.com/img3.jpg", alt=None, context=None),
+            ],
         ]
 
         result = discover_topic("test topic", limit=10)
@@ -40,14 +46,16 @@ class TestTopicDiscovery(unittest.TestCase):
             self.assertIn("example.com", str(entry.source_page_url))
 
     @patch("src.lib.topic_discovery.search_provider.search_pages")
-    @patch("src.lib.topic_discovery.list_images")
+    @patch("src.lib.topic_discovery.list_images_with_metadata")
     @patch("src.lib.topic_discovery.robots_allowed")
     def test_robots_disallowed_pages_skipped(self, mock_robots, mock_list, mock_search):
         """Test that pages disallowed by robots.txt are skipped."""
         mock_search.return_value = ["https://blocked.com/", "https://allowed.com/"]
         # First page blocked, second allowed
         mock_robots.side_effect = [False, True]
-        mock_list.return_value = ["https://allowed.com/img.jpg"]
+        mock_list.return_value = [
+            ImageMetadata(url="https://allowed.com/img.jpg", alt=None, context=None),
+        ]
 
         result = discover_topic("test", limit=10)
 
@@ -67,14 +75,17 @@ class TestTopicDiscovery(unittest.TestCase):
         self.assertEqual(result.query_log.topic, "no results topic")
 
     @patch("src.lib.topic_discovery.search_provider.search_pages")
-    @patch("src.lib.topic_discovery.list_images")
+    @patch("src.lib.topic_discovery.list_images_with_metadata")
     @patch("src.lib.topic_discovery.robots_allowed")
     def test_limit_respected(self, mock_robots, mock_list, mock_search):
         """Test that image limit is respected."""
         mock_search.return_value = ["https://example.com/page1", "https://example.com/page2"]
         mock_robots.return_value = True
         # Each page returns 5 images
-        mock_list.return_value = [f"https://example.com/img{i}.jpg" for i in range(5)]
+        mock_list.return_value = [
+            ImageMetadata(url=f"https://example.com/img{i}.jpg", alt=None, context=None)
+            for i in range(5)
+        ]
 
         result = discover_topic("test", limit=3)
 
@@ -82,7 +93,7 @@ class TestTopicDiscovery(unittest.TestCase):
         self.assertEqual(result.total_images, 3)
 
     @patch("src.lib.topic_discovery.search_provider.search_pages")
-    @patch("src.lib.topic_discovery.list_images")
+    @patch("src.lib.topic_discovery.list_images_with_metadata")
     @patch("src.lib.topic_discovery.robots_allowed")
     @patch("src.lib.topic_discovery.logger")
     def test_logging_called(self, mock_logger, mock_robots, mock_list, mock_search):
@@ -98,13 +109,15 @@ class TestTopicDiscovery(unittest.TestCase):
         self.assertTrue(start and end)
 
     @patch("src.lib.topic_discovery.search_provider.search_pages")
-    @patch("src.lib.topic_discovery.list_images")
+    @patch("src.lib.topic_discovery.list_images_with_metadata")
     @patch("src.lib.topic_discovery.robots_allowed")
     def test_query_log_written(self, mock_robots, mock_list, mock_search):
         """Test that query log file is created."""
         mock_search.return_value = ["https://example.com/"]
         mock_robots.return_value = True
-        mock_list.return_value = ["https://example.com/img.jpg"]
+        mock_list.return_value = [
+            ImageMetadata(url="https://example.com/img.jpg", alt=None, context=None),
+        ]
 
         result = discover_topic("テストトピック", limit=10)
 

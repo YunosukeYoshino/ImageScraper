@@ -12,6 +12,19 @@ class ProvenanceEntry(BaseModel):
     image_url: HttpUrl = Field(..., description="Discovered image URL")
     discovery_method: str = Field(..., description="SERP, sitemap, feed, etc.")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # Relevance scoring fields
+    relevance_score: float = Field(default=0.0, ge=0.0, le=1.0, description="Relevance score 0.0-1.0")
+    alt_text: Optional[str] = Field(default=None, description="Image alt attribute")
+    filename: Optional[str] = Field(default=None, description="Image filename from URL")
+    context_text: Optional[str] = Field(default=None, description="Surrounding text (max 200 chars)")
+
+    def get_relevance_label(self) -> str:
+        """Return human-readable relevance label."""
+        if self.relevance_score >= 0.6:
+            return "高"
+        elif self.relevance_score >= 0.3:
+            return "中"
+        return "低"
 
 
 class QueryLogEntry(BaseModel):

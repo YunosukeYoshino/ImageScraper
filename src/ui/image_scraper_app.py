@@ -41,6 +41,17 @@ with st.expander("🔍 フィルター設定 (US2)", expanded=False):
         min_height = st.number_input("最小高さ (px)", min_value=0, value=0, help="0で制限なし")
     allow_domains = st.text_input("許可ドメイン (カンマ区切り)", placeholder="pixabay.com, unsplash.com", help="空欄で全て許可")
     deny_domains = st.text_input("除外ドメイン (カンマ区切り)", placeholder="spam.com, ads.example.net", help="空欄で除外なし")
+    st.divider()
+    st.caption("関連度フィルター（トピック検索時のみ有効）")
+    min_relevance = st.select_slider(
+        "最小関連度",
+        options=["すべて", "低以上", "中以上", "高のみ"],
+        value="低以上",
+        help="トピック検索時、指定レベル未満の画像を非表示"
+    )
+    # Map label to threshold
+    relevance_thresholds = {"すべて": 0.0, "低以上": 0.0, "中以上": 0.3, "高のみ": 0.6}
+    min_relevance_score = relevance_thresholds[min_relevance]
 
 search_term = st.text_input("検索フィルタ (ファイル名/URL 部分一致)", value="")
 page_size = st.selectbox("ページサイズ", [10, 25, 50, 100], index=1)
@@ -96,11 +107,20 @@ preview_urls = st.session_state.get("preview_urls", [])
 selected: set[str] = st.session_state.get("selected", set())
 provenance_entries: Optional[List[ProvenanceEntry]] = st.session_state.get("provenance_entries", None)
 
+# Build URL to entry mapping for relevance display
+url_to_entry: dict[str, ProvenanceEntry] = {}
+if provenance_entries:
+    url_to_entry = {str(e.image_url): e for e in provenance_entries}
+
 # Apply search filter
 if search_term.strip():
     filtered = [u for u in preview_urls if search_term.lower() in str(u).lower()]
 else:
     filtered = preview_urls
+
+# Apply relevance filter (topic mode only)
+if provenance_entries and min_relevance_score > 0:
+    filtered = [u for u in filtered if url_to_entry.get(u, None) and url_to_entry[u].relevance_score >= min_relevance_score]
 
 # Pagination state
 total = len(filtered)
@@ -136,7 +156,18 @@ if preview_urls:
         col = cols[idx_global % 5]
         u_str = str(u)
         with col:
-            st.image(u_str, caption=Path(u_str).name, use_column_width=True)
+            st.image(u_str, caption=Path(u_str).name, use_container_width=True)
+            # Show relevance badge for topic mode
+            entry = url_to_entry.get(u_str)
+            if entry:
+                score = entry.relevance_score
+                label = entry.get_relevance_label()
+                if score >= 0.6:
+                    st.success(f"🟢 {label} ({score:.2f})")
+                elif score >= 0.3:
+                    st.warning(f"🟡 {label} ({score:.2f})")
+                else:
+                    st.error(f"🔴 {label} ({score:.2f})")
             key = f"sel_{preview_urls.index(u)}"
             checked = st.checkbox("選択", key=key, value=(u_str in selected))
             if checked:
@@ -207,7 +238,7 @@ if preview_urls:
                         grid = st.columns(5)
                         for i, p in enumerate(paths[:20]):  # Show max 20 thumbnails
                             with grid[i % 5]:
-                                st.image(p, caption="✅ " + Path(p).name, use_column_width=True)
+                                st.image(p, caption="✅ " + Path(p).name, use_container_width=True)
 
                         # Offer ZIP download to user
                         import io, zipfile

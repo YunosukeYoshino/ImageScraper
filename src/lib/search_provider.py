@@ -2,23 +2,33 @@ from __future__ import annotations
 """Search provider adapter for topic-based image discovery.
 
 Provides search_pages() to query a search engine and return candidate page URLs.
-Supports DuckDuckGo via duckduckgo_search library with rate limiting.
+Supports DuckDuckGo via ddgs library with rate limiting and retry.
 """
 
 import logging
 import time
+import warnings
 from typing import List, Optional, Callable
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
-# Optional import for duckduckgo_search
-try:
-    from duckduckgo_search import DDGS
-    _HAS_DDGS = True
-except ImportError:
-    _HAS_DDGS = False
-    DDGS = None
+# Optional import for ddgs (formerly duckduckgo_search)
+_HAS_DDGS = False
+DDGS = None
+
+# Suppress deprecation warning from old package name
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", message=".*duckduckgo_search.*renamed.*ddgs.*")
+    try:
+        from ddgs import DDGS
+        _HAS_DDGS = True
+    except ImportError:
+        try:
+            from duckduckgo_search import DDGS
+            _HAS_DDGS = True
+        except ImportError:
+            pass
 
 
 # Rate limiter singleton (can be injected for testing)
@@ -46,18 +56,42 @@ def _is_valid_url(url: str) -> bool:
         return False
 
 
+def _search_with_retry(func, topic: str, max_retries: int = 3, base_delay: float = 2.0):
+    """Execute search function with exponential backoff on rate limit errors."""
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            return func()
+        except Exception as e:
+            last_error = e
+            err_str = str(e).lower()
+            # Detect rate limit errors (202, ratelimit, etc.)
+            if "ratelimit" in err_str or "202" in err_str or "rate" in err_str:
+                delay = base_delay * (2 ** attempt)
+                logger.info("Rate limited, retrying in %.1fs (attempt %d/%d)", delay, attempt + 1, max_retries)
+                time.sleep(delay)
+            else:
+                # Non-rate-limit error, don't retry
+                raise
+    # All retries exhausted
+    if last_error:
+        raise last_error
+    return None
+
+
 def _search_duckduckgo(topic: str, max_pages: int) -> List[str]:
-    """Search DuckDuckGo using duckduckgo_search library."""
+    """Search DuckDuckGo using ddgs library."""
     if not _HAS_DDGS:
-        logger.warning("duckduckgo_search not installed; returning empty results")
+        logger.warning("ddgs not installed; returning empty results")
         return []
 
     urls: List[str] = []
-    try:
+
+    def _do_search():
+        nonlocal urls
         _wait_rate_limit()
         with DDGS() as ddgs:
             # Search for text results (pages containing images)
-            # Append "images" to topic to find image-rich pages
             query = f"{topic} images"
             results = list(ddgs.text(query, max_results=max_pages * 2))
 
@@ -67,7 +101,10 @@ def _search_duckduckgo(topic: str, max_pages: int) -> List[str]:
                 href = r.get("href") or r.get("link") or ""
                 if _is_valid_url(href):
                     urls.append(href)
+        return urls
 
+    try:
+        _search_with_retry(_do_search, topic)
         logger.info("duckduckgo.search topic=%s found=%d", topic, len(urls))
     except Exception as e:
         logger.warning("duckduckgo.search failed topic=%s err=%s", topic, e)
@@ -78,11 +115,13 @@ def _search_duckduckgo(topic: str, max_pages: int) -> List[str]:
 def _search_duckduckgo_images(topic: str, max_pages: int) -> List[str]:
     """Search DuckDuckGo Images directly for image source pages."""
     if not _HAS_DDGS:
-        logger.warning("duckduckgo_search not installed; returning empty results")
+        logger.warning("ddgs not installed; returning empty results")
         return []
 
-    source_pages: List[str] = set()
-    try:
+    source_pages: set[str] = set()
+
+    def _do_search():
+        nonlocal source_pages
         _wait_rate_limit()
         with DDGS() as ddgs:
             results = list(ddgs.images(topic, max_results=max_pages * 5))
@@ -94,7 +133,10 @@ def _search_duckduckgo_images(topic: str, max_pages: int) -> List[str]:
                 page_url = r.get("source") or r.get("url") or ""
                 if _is_valid_url(page_url) and page_url not in source_pages:
                     source_pages.add(page_url)
+        return source_pages
 
+    try:
+        _search_with_retry(_do_search, topic)
         logger.info("duckduckgo.images topic=%s source_pages=%d", topic, len(source_pages))
     except Exception as e:
         logger.warning("duckduckgo.images failed topic=%s err=%s", topic, e)

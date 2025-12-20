@@ -321,6 +321,11 @@ __all__ = [
     "ScrapeResult",
     "_init_drive",
     "robots_allowed",
+    "list_images",
+    "list_images_with_metadata",
+    "ImageMetadata",
+    "download_images",
+    "download_images_parallel",
 ]
 
 # -- New helpers for UI preview/selective download --
@@ -412,6 +417,78 @@ def download_images(
                 except Exception as e:
                     logger.error(f"Drive upload failed for {local}: {e}")
     return saved_files
+
+
+@dataclass
+class ImageMetadata:
+    """Metadata extracted from an image element."""
+    url: str
+    alt: Optional[str] = None
+    context: Optional[str] = None
+
+
+def _extract_context_text(img_tag, max_length: int = 200) -> Optional[str]:
+    """Extract surrounding text from image's parent elements."""
+    try:
+        # Try to get text from parent elements
+        parent = img_tag.parent
+        for _ in range(3):  # Go up to 3 levels
+            if parent is None:
+                break
+            text = parent.get_text(separator=" ", strip=True)
+            if text and len(text) > 10:
+                return text[:max_length]
+            parent = parent.parent
+        return None
+    except Exception:
+        return None
+
+
+def list_images_with_metadata(
+    url: str, limit: Optional[int] = None, respect_robots: bool = True
+) -> List[ImageMetadata]:
+    """Return image URLs with metadata (alt, context) from a page.
+
+    Args:
+        url: Page URL to scrape
+        limit: Maximum number of images to return
+        respect_robots: Check robots.txt before fetching
+
+    Returns:
+        List of ImageMetadata objects containing url, alt text, and context
+    """
+    if respect_robots and not _robots_allowed(url):
+        raise PermissionError(f"Blocked by robots.txt: {url}")
+
+    response = _request_with_retry(url)
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    results: List[ImageMetadata] = []
+    seen: set[str] = set()
+
+    for img in soup.find_all("img"):
+        src = img.get("src") or img.get("data-src") or img.get("data-original")
+        if not src:
+            continue
+
+        full_url = _normalize_url(src.strip(), url)
+        if full_url in seen:
+            continue
+        seen.add(full_url)
+
+        if not _is_image_url(full_url):
+            continue
+
+        # Extract metadata
+        alt = img.get("alt", "").strip() or None
+        context = _extract_context_text(img)
+
+        results.append(ImageMetadata(url=full_url, alt=alt, context=context))
+
+        if limit is not None and len(results) >= limit:
+            break
+
+    return results
 
 
 def download_images_parallel(image_urls: List[str], output_dir: str, max_workers: int = 8, respect_robots: bool = True, progress_cb: Optional[Callable[[int, int], None]] = None) -> List[str]:

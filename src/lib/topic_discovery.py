@@ -26,9 +26,10 @@ except ImportError:
     HAS_PIL = False
 
 from .models_discovery import ProvenanceEntry, PreviewResult, QueryLogEntry, DownloadFilter
-from .image_scraper import robots_allowed, list_images, download_images_parallel, _hash_name
+from .image_scraper import robots_allowed, list_images, list_images_with_metadata, download_images_parallel, _hash_name
 from . import search_provider
 from .rate_limit import TokenBucket
+from .relevance_scorer import calculate_relevance_score, extract_filename_from_url, extract_domain_from_url
 
 logger = logging.getLogger(__name__)
 
@@ -82,23 +83,39 @@ def discover_topic(topic: str, limit: int = 50) -> PreviewResult:
             logger.warning("robots page disallow: %s", page)
             continue
         try:
-            remaining = None if not limit else max(0, limit - len(images_collected))
-            # Reuse existing listing logic which also respects robots for images when requested
-            urls = list_images(page, limit=None, respect_robots=True)
+            # Use metadata-aware extraction for relevance scoring
+            image_metas = list_images_with_metadata(page, limit=None, respect_robots=True)
         except Exception as e:
             logger.warning("list_images.failed page=%s err=%s", page, e)
             continue
-        for u in urls:
+        for meta in image_metas:
             if limit and len(images_collected) >= limit:
                 break
+            # Calculate relevance score
+            filename = extract_filename_from_url(meta.url)
+            domain = extract_domain_from_url(meta.url)
+            score = calculate_relevance_score(
+                topic=topic,
+                alt_text=meta.alt,
+                filename=filename,
+                context_text=meta.context,
+                domain=domain,
+            )
             images_collected.append(
                 ProvenanceEntry(
                     topic=topic,
                     source_page_url=page,
-                    image_url=u,
+                    image_url=meta.url,
                     discovery_method="SERP",
+                    relevance_score=score,
+                    alt_text=meta.alt,
+                    filename=filename,
+                    context_text=meta.context,
                 )
             )
+
+    # Sort by relevance score (highest first)
+    images_collected.sort(key=lambda e: e.relevance_score, reverse=True)
 
     query_log = QueryLogEntry(
         topic=topic,
