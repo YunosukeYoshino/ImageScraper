@@ -50,13 +50,7 @@ uv run python -m unittest discover -s tests/unit -v   # 詳細出力
 
 ## Constitution
 
-本プロジェクトは `.specify/memory/constitution.md` (v1.1.0) の6原則に従います：
-1. Library-First Modularity
-2. CLI & Text Interface
-3. Test-First Enforcement
-4. External Boundary & Integration Safety
-5. Observability & Simplicity
-6. Autonomous Topic Discovery & Provenance
+本プロジェクトは `.specify/memory/constitution.md` (v1.1.0) に従います。
 
 ## Working with Code
 
@@ -66,10 +60,9 @@ uv run python -m unittest discover -s tests/unit -v   # 詳細出力
 
 ## MCP Server Usage
 
-**Serena MCP**: コード検索・パターンマッチングに優先使用
+利用可能なMCPサーバーがある場合、コード検索・パターンマッチングに優先使用
 
 ## Notes
 
 - uvで管理（`package.json`なし）
-- `.tmp_test_out/` - テスト一時ファイル（削除可）
 - FastAPI OpenAPI: http://localhost:8000/docs
