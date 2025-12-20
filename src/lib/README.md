@@ -2,22 +2,103 @@
 
 本ディレクトリには、image-saverのコアロジックが含まれています。
 
-## モジュール一覧
+## アーキテクチャ
+
+Clean Architectureに基づく3層構造を採用しています。
+
+```
+src/lib/
+├── domain/                 # ドメイン層（ビジネスロジック）
+│   ├── entities/           # エンティティ・値オブジェクト
+│   ├── services/           # ドメインサービス
+│   └── repositories/       # リポジトリインターフェース
+├── infrastructure/         # インフラ層（外部依存）
+│   ├── http/               # HTTP通信・robots.txt
+│   ├── parsers/            # HTML解析
+│   ├── storage/            # ファイルストレージ
+│   └── search/             # 検索プロバイダ実装
+├── application/            # アプリケーション層
+│   ├── services/           # 横断的サービス（レート制限等）
+│   └── use_cases/          # ユースケース（将来用）
+└── [レガシーモジュール]     # 後方互換のため維持
+```
+
+### 依存方向
+
+```
+domain ← application ← infrastructure
+   ↑          ↑             ↑
+   └──────────┴─────────────┘
+        presentation (ui/api/cli)
+```
+
+## レイヤー詳細
+
+### Domain Layer（ドメイン層）
+
+外部依存なし。純粋なビジネスロジック。
 
 | モジュール | 役割 |
 |-----------|------|
-| `image_scraper.py` | ネットワーク取得、HTML解析（BeautifulSoup）、画像ダウンロード、Drive連携。UI向けヘルパー（`list_images`、`download_images`、`download_images_parallel`）も提供 |
-| `topic_discovery.py` | トピック（検索ワード）から候補ページを自律的に探索し、プロベナンス記録を生成 |
-| `search_provider.py` | 検索プロバイダ（DuckDuckGo等）のラッパー。レート制限と再試行を実装 |
-| `rate_limit.py` | トークンバケット方式のレート制限（burst制御付き） |
-| `models_discovery.py` | プロベナンスエントリ、クエリログ、プレビュー結果のデータモデル |
-| `ui_helpers.py` | UI向けユーティリティ（JSON検証、URL構築、設定保存/読込） |
+| `entities/provenance.py` | `ProvenanceEntry`, `QueryLogEntry`, `DownloadFilter`, `PreviewResult` |
+| `services/relevance_scorer.py` | 画像の関連性スコア計算（alt/ファイル名/コンテキスト/ドメイン） |
+| `repositories/search_repository.py` | 検索プロバイダの抽象インターフェース |
+
+### Infrastructure Layer（インフラ層）
+
+外部システムとの接続を担当。
+
+| モジュール | 役割 |
+|-----------|------|
+| `http/http_client.py` | HTTP取得、リトライ、デフォルトヘッダー |
+| `http/robots_checker.py` | robots.txtチェック |
+| `parsers/html_parser.py` | BeautifulSoupによるHTML解析、画像抽出 |
+| `storage/local_storage.py` | ローカルファイル保存、ハッシュ命名 |
+| `search/duckduckgo_search.py` | DuckDuckGo検索の実装（SearchRepository） |
+
+### Application Layer（アプリケーション層）
+
+ユースケース調整と横断的関心事。
+
+| モジュール | 役割 |
+|-----------|------|
+| `services/rate_limiter.py` | トークンバケット方式のレート制限 |
+| `use_cases/` | 将来のユースケース実装用（現在は空） |
+
+## レガシーモジュール（後方互換）
+
+以下のモジュールは新しい場所から再エクスポートしており、既存コードとの互換性を維持しています。
+
+| レガシー | 新しい場所 |
+|----------|-----------|
+| `models_discovery.py` | `domain/entities/provenance.py` |
+| `relevance_scorer.py` | `domain/services/relevance_scorer.py` |
+| `rate_limit.py` | `application/services/rate_limiter.py` |
+
+**新規コードは新しい場所から直接インポートしてください。**
 
 ## 設計原則
 
 - **Library-First**: 各モジュールは独立してテスト可能
+- **依存性逆転**: domain層は外部に依存しない
 - **外部境界の安全性**: ネットワーク/API境界にエラーハンドリング（タイムアウト、リトライ、ログ）
 - **robots.txt尊重**: ページおよび画像URLの両方で厳密に尊重
+
+## 関連性スコアリング
+
+トピック検索で取得した画像の関連性を0.0〜1.0でスコアリング。
+
+| 評価要素 | 重み | 説明 |
+|----------|------|------|
+| alt属性 | 0.4 | 画像の説明テキスト（最重要） |
+| ファイル名 | 0.3 | URL末尾のファイル名 |
+| 周囲テキスト | 0.2 | 親要素のテキスト（最大200文字） |
+| ドメイン信頼度 | 0.1 | wikimedia, pixabay等は加点 |
+
+**スコア分類:**
+- 高（0.6以上）🟢
+- 中（0.3-0.6）🟡
+- 低（0.3未満）🔴
 
 ## Topic Discovery & Provenance
 

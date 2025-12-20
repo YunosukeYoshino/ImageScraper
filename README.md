@@ -11,6 +11,7 @@ Webページから画像を収集し、ローカル保存やGoogle Driveへの�
 
 - **マルチインターフェース** — CLI、FastAPI、Streamlit UIの3つの入口から同一のコア機能を利用
 - **トピック探索** — キーワードから自律的に画像を発見し、プロベナンス（出典情報）付きで管理
+- **関連性スコアリング** — alt属性・ファイル名・周囲テキストから関連度を自動計算（高🟢/中🟡/低🔴）
 - **並列ダウンロード** — 8ワーカーによる高速ダウンロードと進捗表示
 - **robots.txt準拠** — ページ・画像URLともに自動でアクセス制限を尊重
 - **Google Drive連携** — rclone（個人向け）またはサービスアカウント（自動化向け）に対応
@@ -53,6 +54,7 @@ uv run streamlit run src/ui/image_scraper_app.py
 
 **主な機能:**
 - 画像プレビュー（ダウンロード前に確認）
+- 関連性フィルタ（高/中/低でスコア絞り込み）
 - 検索フィルタ（URL/ファイル名で絞り込み）
 - ページネーション（10/25/50/100件表示）
 - 選択ダウンロード + ZIPエクスポート
@@ -189,12 +191,16 @@ uv run python -m unittest tests.unit.test_api
 
 ```
 src/
-├── lib/           # コアライブラリ（スクレイパー、探索、アップローダー）
-├── cli/           # CLIエントリポイント
-├── api/           # FastAPI サーバー
-└── ui/            # Streamlit UI
+├── lib/                    # コアライブラリ
+│   ├── domain/             # ドメイン層（エンティティ、ビジネスロジック）
+│   ├── infrastructure/     # インフラ層（HTTP、パーサー、ストレージ）
+│   ├── application/        # アプリケーション層（ユースケース、サービス）
+│   └── [レガシーモジュール] # 後方互換のため維持
+├── cli/                    # CLIエントリポイント
+├── api/                    # FastAPI サーバー
+└── ui/                     # Streamlit UI
 tests/
-└── unit/          # ユニットテスト
+└── unit/                   # ユニットテスト
 ```
 
 **主要モジュール:**
@@ -203,8 +209,9 @@ tests/
 |--------|-------------|
 | `image_scraper.py` | 画像取得・解析・保存のコアロジック |
 | `topic_discovery.py` | トピックベースの自律探索 |
+| `domain/services/relevance_scorer.py` | 画像の関連性スコアリング |
 | `drive_uploader.py` | Google Driveアップロード（Strategy Pattern） |
-| `rate_limit.py` | トークンバケット方式のレート制限 |
+| `application/services/rate_limiter.py` | トークンバケット方式のレート制限 |
 
 ## Best Practices
 

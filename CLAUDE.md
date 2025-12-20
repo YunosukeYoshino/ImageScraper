@@ -36,6 +36,9 @@ uv run python -m unittest discover -s tests/unit -v   # 詳細出力
 
 ### ディレクトリ構成
 - `src/lib/` - コアロジック（詳細: `src/lib/README.md`）
+  - `domain/` - ドメイン層（エンティティ、ビジネスロジック、リポジトリIF）
+  - `infrastructure/` - インフラ層（HTTP、パーサー、ストレージ、検索）
+  - `application/` - アプリケーション層（ユースケース、横断的サービス）
 - `src/api/` - FastAPI
 - `src/ui/` - Streamlit UI（詳細: `src/ui/README.md`）
 - `src/cli/` - CLIエントリポイント
@@ -44,9 +47,11 @@ uv run python -m unittest discover -s tests/unit -v   # 詳細出力
 - `.specify/` - プロジェクト仕様・憲章
 
 ### Key Patterns
+- **Clean Architecture**: domain → application → infrastructure の依存方向
 - **CLI Contract**: 引数→stdout（JSON）、エラー→stderr + 非ゼロ終了
 - **robots.txt**: ページ・画像両方で厳密に尊重（デフォルト有効）
 - **ファイル命名**: URLのSHA-256ハッシュ + 拡張子
+- **関連性スコアリング**: alt属性(0.4)/ファイル名(0.3)/周囲テキスト(0.2)/ドメイン信頼度(0.1)
 
 ## Constitution
 
