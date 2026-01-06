@@ -1,7 +1,6 @@
-import os
-import json
 import types
 from unittest import TestCase, mock
+
 from fastapi.testclient import TestClient
 
 # We will import app after creating src/api/app.py
@@ -9,6 +8,7 @@ try:
     from src.api.app import app
 except Exception:
     app = None
+
 
 class TestAPI(TestCase):
     def setUp(self):

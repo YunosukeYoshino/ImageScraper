@@ -1,6 +1,9 @@
 from __future__ import annotations
-from pydantic import BaseModel, Field, HttpUrl
+
 from typing import List, Optional
+
+from pydantic import BaseModel, Field, HttpUrl
+
 
 class ScrapeRequest(BaseModel):
     url: HttpUrl
@@ -8,6 +11,7 @@ class ScrapeRequest(BaseModel):
     respect_robots: bool = Field(default=True)
     upload_to_drive: bool = Field(default=False)
     drive_folder_id: Optional[str] = None
+
 
 class ScrapeSummary(BaseModel):
     saved: int
@@ -17,6 +21,7 @@ class ScrapeSummary(BaseModel):
     warnings: Optional[List[str]] = None
     errors: Optional[List[str]] = None
     files: Optional[List[str]] = None
+
 
 class ErrorResponse(BaseModel):
     code: int

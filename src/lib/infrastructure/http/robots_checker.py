@@ -1,9 +1,10 @@
 """Robots.txt checking functionality."""
+
 from __future__ import annotations
 
 import logging
-from urllib.parse import urlparse
 from urllib import robotparser
+from urllib.parse import urlparse
 
 from .http_client import DEFAULT_HEADERS
 
@@ -46,9 +47,7 @@ class RobotsChecker:
 _default_checker = RobotsChecker()
 
 
-def robots_allowed(
-    target_url: str, user_agent: str = DEFAULT_HEADERS["User-Agent"]
-) -> bool:
+def robots_allowed(target_url: str, user_agent: str = DEFAULT_HEADERS["User-Agent"]) -> bool:
     """Check if robots.txt allows fetching target_url.
 
     Public function for checking robots.txt rules.

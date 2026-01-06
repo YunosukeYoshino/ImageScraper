@@ -2,14 +2,15 @@
 
 New code should import from src.lib.domain.entities instead.
 """
+
 from __future__ import annotations
 
 # Re-export from new location for backward compatibility
 from .domain.entities.provenance import (
-    ProvenanceEntry,
-    QueryLogEntry,
     DownloadFilter,
     PreviewResult,
+    ProvenanceEntry,
+    QueryLogEntry,
 )
 
 __all__ = [

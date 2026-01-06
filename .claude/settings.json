@@ -3,18 +3,5 @@
     "defaultMode": "bypassPermissions"
   },
   "enableAllProjectMcpServers": true,
-  "model": "opus",
-  "hooks": {
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "cd /Users/yoshinoyuunosuke/Desktop/playground/python/ImageScraper && uv run python -m unittest discover -s tests/unit -v"
-          }
-        ]
-      }
-    ]
-  }
+  "model": "opus"
 }

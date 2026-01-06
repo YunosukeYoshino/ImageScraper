@@ -18,7 +18,7 @@ class DummyResp:
 
 
 class TestListAndDownloadImages(unittest.TestCase):
-    @mock.patch.object(mod, '_request_with_retry')
+    @mock.patch.object(mod, "_request_with_retry")
     def test_list_images_正規化されたURLを返す(self, mock_request: mock.Mock):
         # Arrange
         html = """
@@ -41,12 +41,10 @@ class TestListAndDownloadImages(unittest.TestCase):
         self.assertIn("https://example.com/b.svg", urls)
         mock_request.assert_called_once_with("https://example.com/page")
 
-    @mock.patch.object(mod, '_robots_allowed')
-    @mock.patch.object(mod, '_download_image')
+    @mock.patch.object(mod, "_robots_allowed")
+    @mock.patch.object(mod, "_download_image")
     def test_download_images_robots_txtで禁止されたURLをスキップする(
-        self,
-        mock_download: mock.Mock,
-        mock_robots: mock.Mock
+        self, mock_download: mock.Mock, mock_robots: mock.Mock
     ):
         # Arrange
         urls = [
@@ -76,7 +74,7 @@ class TestListAndDownloadImages(unittest.TestCase):
         self.assertEqual(len(out), 2)
         self.assertEqual(mock_download.call_count, 2)
         self.assertEqual(mock_robots.call_count, 3)  # 全URLに対してチェック
-        self.assertTrue(all(s.endswith(('.jpg', '.png', '.svg', '.bin')) for s in saved_paths))
+        self.assertTrue(all(s.endswith((".jpg", ".png", ".svg", ".bin")) for s in saved_paths))
 
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@ class DummyResp:
 
 
 class TestParseImages(unittest.TestCase):
-    @mock.patch.object(mod, '_request_with_retry')
+    @mock.patch.object(mod, "_request_with_retry")
     def test_画像URLを抽出し正規化する(self, mock_request):
         # Arrange
         html = """
@@ -32,12 +32,7 @@ class TestParseImages(unittest.TestCase):
         mock_request.return_value = DummyResp(html)
 
         # Act
-        res = mod.scrape_images(
-            "https://example.com/page",
-            "./.tmp_test_out",
-            limit=None,
-            respect_robots=False
-        )
+        res = mod.scrape_images("https://example.com/page", "./.tmp_test_out", limit=None, respect_robots=False)
 
         # Assert
         self.assertEqual(res.page_url, "https://example.com/page")

@@ -1,4 +1,3 @@
-from __future__ import annotations
 """Relevance scoring for topic-based image discovery.
 
 Calculates a 0.0-1.0 relevance score based on keyword matching in:
@@ -8,8 +7,10 @@ Calculates a 0.0-1.0 relevance score based on keyword matching in:
 - domain trust (weight: 0.1)
 """
 
+from __future__ import annotations
+
 import re
-from typing import Optional, List
+from typing import List, Optional
 from urllib.parse import urlparse
 
 # Weights for each scoring component

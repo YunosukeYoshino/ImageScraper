@@ -6,12 +6,10 @@ from src.lib import image_scraper as mod
 
 
 class TestParallelDownload(unittest.TestCase):
-    @mock.patch.object(mod, '_robots_allowed')
-    @mock.patch.object(mod, '_download_image')
+    @mock.patch.object(mod, "_robots_allowed")
+    @mock.patch.object(mod, "_download_image")
     def test_複数URLを並列ダウンロードし進捗コールバックが完了まで実行される(
-        self,
-        mock_download_image,
-        mock_robots_allowed
+        self, mock_download_image, mock_robots_allowed
     ):
         # Arrange: テスト対象データとモックを準備
         urls = [f"https://example.com/{i}.jpg" for i in range(6)]
@@ -26,16 +24,13 @@ class TestParallelDownload(unittest.TestCase):
         mock_robots_allowed.return_value = True
 
         progresses = []
+
         def progress_callback(done, total):
             progresses.append((done, total))
 
         # Act: 並列ダウンロードを実行
         result = mod.download_images_parallel(
-            urls,
-            "./.tmp_test_out",
-            max_workers=3,
-            respect_robots=True,
-            progress_cb=progress_callback
+            urls, "./.tmp_test_out", max_workers=3, respect_robots=True, progress_cb=progress_callback
         )
 
         # Assert: 結果と進捗を検証

@@ -2,16 +2,15 @@ import json
 import os
 import tempfile
 import unittest
-from unittest.mock import patch, Mock, MagicMock
+from unittest.mock import patch
 
+from src.lib.image_scraper import ImageMetadata
+from src.lib.models_discovery import DownloadFilter, PreviewResult, ProvenanceEntry
 from src.lib.topic_discovery import (
     discover_topic,
-    filter_entries,
     download_selected,
-    _DISCOVERY_LOG_DIR,
+    filter_entries,
 )
-from src.lib.models_discovery import PreviewResult, ProvenanceEntry, DownloadFilter
-from src.lib.image_scraper import ImageMetadata
 
 
 class TestTopicDiscovery(unittest.TestCase):
@@ -83,8 +82,7 @@ class TestTopicDiscovery(unittest.TestCase):
         mock_robots.return_value = True
         # Each page returns 5 images
         mock_list.return_value = [
-            ImageMetadata(url=f"https://example.com/img{i}.jpg", alt=None, context=None)
-            for i in range(5)
+            ImageMetadata(url=f"https://example.com/img{i}.jpg", alt=None, context=None) for i in range(5)
         ]
 
         result = discover_topic("test", limit=3)
@@ -132,11 +130,13 @@ class TestSearchProvider(unittest.TestCase):
 
     def test_search_pages_empty_topic(self):
         from src.lib import search_provider
+
         result = search_provider.search_pages("", max_pages=5)
         self.assertEqual(result, [])
 
     def test_search_pages_unsupported_provider(self):
         from src.lib import search_provider
+
         result = search_provider.search_pages("test", provider="unknown", max_pages=5)
         self.assertEqual(result, [])
 

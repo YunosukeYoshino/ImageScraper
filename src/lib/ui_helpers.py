@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 from urllib.parse import urlencode
-
 
 SENSITIVE_KEYS = ("auth", "token", "secret", "key", "cookie", "password")
 
@@ -90,11 +88,13 @@ def save_config(cfg: Dict) -> None:
 
 
 def summarize_response(status: int, duration_ms: int, text: str, content_type: Optional[str]) -> Dict:
-    body_type = (
-        "json"
-        if content_type and "json" in content_type.lower()
-        else ("text" if content_type and ("text" in content_type.lower() or "html" in content_type.lower()) else "other")
-    )
+    ct_lower = content_type.lower() if content_type else ""
+    if "json" in ct_lower:
+        body_type = "json"
+    elif "text" in ct_lower or "html" in ct_lower:
+        body_type = "text"
+    else:
+        body_type = "other"
     preview_limit = 8000
     preview = text if len(text) <= preview_limit else text[:preview_limit] + "\n... (truncated)"
     return {

@@ -1,14 +1,15 @@
-from __future__ import annotations
 """Search provider adapter for topic-based image discovery.
 
 Provides search_pages() to query a search engine and return candidate page URLs.
 Supports DuckDuckGo via ddgs library with rate limiting and retry.
 """
 
+from __future__ import annotations
+
 import logging
 import time
 import warnings
-from typing import List, Optional, Callable
+from typing import Callable, List, Optional
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -22,10 +23,12 @@ with warnings.catch_warnings():
     warnings.filterwarnings("ignore", message=".*duckduckgo_search.*renamed.*ddgs.*")
     try:
         from ddgs import DDGS
+
         _HAS_DDGS = True
     except ImportError:
         try:
             from duckduckgo_search import DDGS
+
             _HAS_DDGS = True
         except ImportError:
             pass
@@ -67,7 +70,7 @@ def _search_with_retry(func, topic: str, max_retries: int = 3, base_delay: float
             err_str = str(e).lower()
             # Detect rate limit errors (202, ratelimit, etc.)
             if "ratelimit" in err_str or "202" in err_str or "rate" in err_str:
-                delay = base_delay * (2 ** attempt)
+                delay = base_delay * (2**attempt)
                 logger.info("Rate limited, retrying in %.1fs (attempt %d/%d)", delay, attempt + 1, max_retries)
                 time.sleep(delay)
             else:

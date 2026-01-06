@@ -40,7 +40,7 @@ class TestTokenBucket(unittest.TestCase):
         # Assert
         self.assertFalse(result)
 
-    @mock.patch('src.lib.application.services.rate_limiter.time')
+    @mock.patch("src.lib.application.services.rate_limiter.time")
     def test_時間経過でトークンが補充される(self, mock_time):
         """
         Given: capacity=2, fill_rate=10 のTokenBucketからトークンを2個取得済み
@@ -61,7 +61,7 @@ class TestTokenBucket(unittest.TestCase):
         # Assert
         self.assertTrue(result)
 
-    @mock.patch('src.lib.application.services.rate_limiter.time')
+    @mock.patch("src.lib.application.services.rate_limiter.time")
     def test_補充レートを超える時間が経過しても容量以上には補充されない(self, mock_time):
         """
         Given: capacity=2, fill_rate=10 のTokenBucketからトークンを2個取得済み
@@ -82,7 +82,7 @@ class TestTokenBucket(unittest.TestCase):
         self.assertTrue(tb.non_blocking_try_acquire())
         self.assertFalse(tb.non_blocking_try_acquire())
 
-    @mock.patch('src.lib.application.services.rate_limiter.time')
+    @mock.patch("src.lib.application.services.rate_limiter.time")
     def test_acquire_はトークンが利用可能になるまでポーリングする(self, mock_time):
         """
         Given: capacity=1, fill_rate=2 のTokenBucketからトークンを取得済み
@@ -94,6 +94,7 @@ class TestTokenBucket(unittest.TestCase):
         mock_time.monotonic.side_effect = lambda: current_time
 
         sleep_calls = []
+
         def mock_sleep(duration):
             nonlocal current_time
             sleep_calls.append(duration)
@@ -111,7 +112,7 @@ class TestTokenBucket(unittest.TestCase):
         # Assert: sleep()が少なくとも1回呼ばれ、取得に成功したこと
         self.assertGreater(len(sleep_calls), 0, "sleep()が呼ばれるべき")
 
-    @mock.patch('src.lib.application.services.rate_limiter.time')
+    @mock.patch("src.lib.application.services.rate_limiter.time")
     def test_acquire_はタイムアウト時にTimeoutErrorを発生させる(self, mock_time):
         """
         Given: capacity=1 のTokenBucketからトークンを取得済み

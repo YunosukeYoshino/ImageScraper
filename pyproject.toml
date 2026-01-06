@@ -21,10 +21,27 @@ dependencies = [
 # Service Account authentication for Google Drive
 drive = ["google-api-python-client>=2.149.0", "google-auth>=2.35.0"]
 
+dev = [
+  "pre-commit>=3.7.0",
+  "ruff>=0.6.9",
+]
+
 # Note: rclone support requires the rclone CLI tool to be installed separately:
 #   macOS: brew install rclone
 #   Linux: curl https://rclone.org/install.sh | sudo bash
 #   Or use: ./scripts/setup_rclone.sh
 
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
 [tool.uv]
 # Minimal uv table; remove unsupported sub-tables to avoid warnings
+

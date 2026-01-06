@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from threading import Lock
 
+
 class TokenBucket:
     """Simple token bucket rate limiter.
 

@@ -4,13 +4,15 @@ t.wada流テスト哲学に基づき、公開APIの振る舞いのみをテス�
 private関数(_tokenize, _calculate_match_ratio, _score_domain)は
 公開API経由で間接的に検証される。
 """
+
 from __future__ import annotations
+
 import unittest
 
 from src.lib.domain.services import (
     calculate_relevance_score,
-    extract_filename_from_url,
     extract_domain_from_url,
+    extract_filename_from_url,
 )
 
 

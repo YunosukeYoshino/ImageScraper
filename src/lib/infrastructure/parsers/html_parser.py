@@ -1,4 +1,5 @@
 """HTML parsing and image extraction."""
+
 from __future__ import annotations
 
 import re
@@ -8,9 +9,7 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
-IMG_EXT_PATTERN = re.compile(
-    r"\.(?:png|jpe?g|gif|webp|svg)(?:\?.*)?$", re.IGNORECASE
-)
+IMG_EXT_PATTERN = re.compile(r"\.(?:png|jpe?g|gif|webp|svg)(?:\?.*)?$", re.IGNORECASE)
 
 
 @dataclass

@@ -1,9 +1,9 @@
 from __future__ import annotations
+
+import json
 import sys
 from pathlib import Path
-import time
-from typing import Optional, List
-import json
+from typing import List, Optional
 
 import streamlit as st
 
@@ -13,11 +13,10 @@ _REPO_ROOT = _THIS_FILE.parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from src.lib.image_scraper import scrape_images
-from src.lib.topic_discovery import discover_topic, download_selected, filter_entries
-from src.lib.models_discovery import DownloadFilter, ProvenanceEntry
-from src.lib import image_scraper as scraper
-from src.lib.drive_uploader import RcloneUploader
+from src.lib import image_scraper as scraper  # noqa: E402
+from src.lib.drive_uploader import RcloneUploader  # noqa: E402
+from src.lib.models_discovery import DownloadFilter, ProvenanceEntry  # noqa: E402
+from src.lib.topic_discovery import discover_topic, download_selected  # noqa: E402
 
 # --- Google Drive履歴管理 ---
 GDRIVE_HISTORY_FILE = Path.home() / ".image_saver_gdrive_history.json"
@@ -54,11 +53,15 @@ def save_gdrive_history(new_path: str) -> None:
 st.set_page_config(page_title="image-saver | 画像スクレイパー", layout="centered")
 
 st.title("URL/トピックで画像スクレイパー")
-st.caption("URLプレビュー → 選択ダウンロード、またはトピック（検索ワード）から自律探索プレビュー。robots.txt を尊重します。")
+st.caption(
+    "URLプレビュー → 選択ダウンロード、またはトピック（検索ワード）から自律探索プレビュー。robots.txt を尊重します。"
+)
 
 # --- Input Section ---
 url = st.text_input("対象URL", placeholder="https://example.com")
-topic = st.text_input("トピック（検索ワード）", placeholder="例: 富士山 紅葉", help="URLの代わりにトピックを入力してプレビュー")
+topic = st.text_input(
+    "トピック（検索ワード）", placeholder="例: 富士山 紅葉", help="URLの代わりにトピックを入力してプレビュー"
+)
 output_dir = st.text_input("保存先ディレクトリ", value="./images")
 limit = st.number_input("最大枚数(任意)", min_value=0, max_value=500, value=0, help="0は上限なし")
 respect_robots = st.toggle("robots.txt を尊重", value=True)
@@ -71,15 +74,19 @@ with st.expander("🔍 フィルター設定 (US2)", expanded=False):
         min_width = st.number_input("最小幅 (px)", min_value=0, value=0, help="0で制限なし")
     with col_f2:
         min_height = st.number_input("最小高さ (px)", min_value=0, value=0, help="0で制限なし")
-    allow_domains = st.text_input("許可ドメイン (カンマ区切り)", placeholder="pixabay.com, unsplash.com", help="空欄で全て許可")
-    deny_domains = st.text_input("除外ドメイン (カンマ区切り)", placeholder="spam.com, ads.example.net", help="空欄で除外なし")
+    allow_domains = st.text_input(
+        "許可ドメイン (カンマ区切り)", placeholder="pixabay.com, unsplash.com", help="空欄で全て許可"
+    )
+    deny_domains = st.text_input(
+        "除外ドメイン (カンマ区切り)", placeholder="spam.com, ads.example.net", help="空欄で除外なし"
+    )
     st.divider()
     st.caption("関連度フィルター（トピック検索時のみ有効）")
     min_relevance = st.select_slider(
         "最小関連度",
         options=["すべて", "低以上", "中以上", "高のみ"],
         value="低以上",
-        help="トピック検索時、指定レベル未満の画像を非表示"
+        help="トピック検索時、指定レベル未満の画像を非表示",
     )
     # Map label to threshold
     relevance_thresholds = {"すべて": 0.0, "低以上": 0.0, "中以上": 0.3, "高のみ": 0.6}
@@ -89,7 +96,7 @@ search_term = st.text_input("検索フィルタ (ファイル名/URL 部分一�
 page_size = st.selectbox("ページサイズ", [10, 25, 50, 100], index=1)
 select_all_toggle = st.checkbox("全選択/全解除", value=False)
 
-col_r1, col_r2, col_r3 = st.columns([1,1,2])
+col_r1, col_r2, col_r3 = st.columns([1, 1, 2])
 with col_r1:
     run_preview = st.button("URLプレビュー")
 with col_r2:
@@ -152,13 +159,15 @@ else:
 
 # Apply relevance filter (topic mode only)
 if provenance_entries and min_relevance_score > 0:
-    filtered = [u for u in filtered if url_to_entry.get(u, None) and url_to_entry[u].relevance_score >= min_relevance_score]
+    filtered = [
+        u for u in filtered if url_to_entry.get(u, None) and url_to_entry[u].relevance_score >= min_relevance_score
+    ]
 
 # Pagination state
 total = len(filtered)
 page_count = max(1, (total + page_size - 1) // page_size)
 page_index = st.session_state.get("page_index", 0)
-col_p1, col_p2, col_p3 = st.columns([1,1,3])
+col_p1, col_p2, col_p3 = st.columns([1, 1, 3])
 with col_p1:
     if st.button("前へ", disabled=page_index <= 0):
         page_index = max(0, page_index - 1)
@@ -208,7 +217,7 @@ if preview_urls:
                 selected.discard(u_str)
     st.session_state["selected"] = selected
 
-    col_d1, col_d2 = st.columns([1,1])
+    col_d1, col_d2 = st.columns([1, 1])
     with col_d1:
         do_download_all = st.button("全てダウンロード")
     with col_d2:
@@ -222,15 +231,22 @@ if preview_urls:
             with st.spinner("ダウンロード中..."):
                 try:
                     progress = st.progress(0)
+
                     def cb(done, total):
                         progress.progress(int(done / total * 100))
 
                     # Build filter
+                    allow_list = (
+                        [d.strip() for d in allow_domains.split(",") if d.strip()] if allow_domains.strip() else None
+                    )
+                    deny_list = (
+                        [d.strip() for d in deny_domains.split(",") if d.strip()] if deny_domains.strip() else None
+                    )
                     download_filter = DownloadFilter(
                         min_width=min_width if min_width > 0 else None,
                         min_height=min_height if min_height > 0 else None,
-                        allow_domains=[d.strip() for d in allow_domains.split(",") if d.strip()] if allow_domains.strip() else None,
-                        deny_domains=[d.strip() for d in deny_domains.split(",") if d.strip()] if deny_domains.strip() else None,
+                        allow_domains=allow_list,
+                        deny_domains=deny_list,
                     )
 
                     # US2: If we have provenance entries (topic mode), use download_selected
@@ -252,18 +268,28 @@ if preview_urls:
                         filtered_target = target_urls
                         if download_filter.allow_domains or download_filter.deny_domains:
                             from urllib.parse import urlparse
+
                             def _domain_check(u: str) -> bool:
                                 domain = urlparse(u).netloc.lower()
                                 if download_filter.allow_domains:
-                                    if not any(domain == d.lower() or domain.endswith("." + d.lower()) for d in download_filter.allow_domains):
+                                    if not any(
+                                        domain == d.lower() or domain.endswith("." + d.lower())
+                                        for d in download_filter.allow_domains
+                                    ):
                                         return False
                                 if download_filter.deny_domains:
-                                    if any(domain == d.lower() or domain.endswith("." + d.lower()) for d in download_filter.deny_domains):
+                                    if any(
+                                        domain == d.lower() or domain.endswith("." + d.lower())
+                                        for d in download_filter.deny_domains
+                                    ):
                                         return False
                                 return True
+
                             filtered_target = [u for u in target_urls if _domain_check(u)]
 
-                        paths = scraper.download_images_parallel(filtered_target, output_dir.strip(), respect_robots=respect_robots, progress_cb=cb)
+                        paths = scraper.download_images_parallel(
+                            filtered_target, output_dir.strip(), respect_robots=respect_robots, progress_cb=cb
+                        )
                         st.success(f"保存: {len(paths)} 枚")
 
                     if paths:
@@ -273,7 +299,9 @@ if preview_urls:
                                 st.image(p, caption="✅ " + Path(p).name, use_container_width=True)
 
                         # Offer ZIP download to user
-                        import io, zipfile
+                        import io
+                        import zipfile
+
                         mem = io.BytesIO()
                         with zipfile.ZipFile(mem, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
                             for p in paths:
@@ -285,7 +313,7 @@ if preview_urls:
                             label="ZIPをダウンロード",
                             data=mem.getvalue(),
                             file_name=dl_filename,
-                            mime="application/zip"
+                            mime="application/zip",
                         )
 
                         # Store download info for Google Drive upload
@@ -303,7 +331,9 @@ if st.session_state.get("last_download_dir") and st.session_state.get("last_down
     # Check rclone availability
     uploader = RcloneUploader("gdrive")
     if not uploader.is_available():
-        st.warning("rclone が設定されていません。ターミナルで `rclone config` を実行して gdrive リモートを設定してください。")
+        st.warning(
+            "rclone が設定されていません。ターミナルで `rclone config` を実行して gdrive リモートを設定してください。"
+        )
     else:
         # Load history
         gdrive_history = load_gdrive_history()
@@ -321,7 +351,7 @@ if st.session_state.get("last_download_dir") and st.session_state.get("last_down
                     options=range(len(history_options)),
                     format_func=lambda i: history_options[i],
                     index=0,
-                    help="過去に使用したパス"
+                    help="過去に使用したパス",
                 )
                 if selected_idx > 0:
                     # 履歴から選択された場合、入力欄に反映
@@ -332,7 +362,7 @@ if st.session_state.get("last_download_dir") and st.session_state.get("last_down
                 "アップロード先パス",
                 placeholder="/n8n/ImagePost/fashion-cosme",
                 help="例: /n8n/ImagePost/fashion-cosme",
-                key="gdrive_path_input"
+                key="gdrive_path_input",
             )
 
         upload_dir = st.session_state.get("last_download_dir", "")
@@ -346,9 +376,7 @@ if st.session_state.get("last_download_dir") and st.session_state.get("last_down
                 with st.spinner("Google Drive にアップロード中..."):
                     try:
                         success_count, failed_files = uploader.upload_directory(
-                            local_dir=upload_dir,
-                            remote_folder=gdrive_path.strip(),
-                            delete_after=True
+                            local_dir=upload_dir, remote_folder=gdrive_path.strip(), delete_after=True
                         )
 
                         if not failed_files:

@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime
 
-from src.lib.models_discovery import ProvenanceEntry, QueryLogEntry, PreviewResult
+from src.lib.models_discovery import PreviewResult, ProvenanceEntry, QueryLogEntry
 
 
 class TestProvenanceModels(unittest.TestCase):

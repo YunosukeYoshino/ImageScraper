@@ -1,18 +1,21 @@
 from __future__ import annotations
+
 import logging
 import os
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-from typing import Optional
 
-from src.api.schemas import ScrapeRequest, ScrapeSummary, ErrorResponse
-from src.lib.image_scraper import scrape_images, _init_drive
+from src.api.schemas import ScrapeRequest, ScrapeSummary
+from src.lib.image_scraper import _init_drive, scrape_images
 
 app = FastAPI(title="image-saver API", version="0.1.0")
+
 
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
+
 
 @app.post("/scrape", response_model=ScrapeSummary)
 def scrape(req: ScrapeRequest, request: Request):
@@ -22,14 +25,17 @@ def scrape(req: ScrapeRequest, request: Request):
     if req.upload_to_drive:
         sa_json = os.environ.get("GDRIVE_SA_JSON")
         if not sa_json:
-            raise HTTPException(status_code=400, detail={
-                "code": 400,
-                "message": "upload_to_drive=true requires GDRIVE_SA_JSON env set to service account JSON path",
-            })
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": 400,
+                    "message": "upload_to_drive=true requires GDRIVE_SA_JSON env set to service account JSON path",
+                },
+            )
         try:
             drive_service = _init_drive(sa_json)
         except Exception as e:
-            raise HTTPException(status_code=500, detail={"code": 500, "message": f"Drive init failed: {e}"})
+            raise HTTPException(status_code=500, detail={"code": 500, "message": f"Drive init failed: {e}"}) from e
 
     try:
         res = scrape_images(
@@ -42,13 +48,13 @@ def scrape(req: ScrapeRequest, request: Request):
         )
     except PermissionError as e:
         logging.warning(f"robots disallow: {e}")
-        raise HTTPException(status_code=403, detail={"code": 403, "message": str(e)})
+        raise HTTPException(status_code=403, detail={"code": 403, "message": str(e)}) from e
     except ValueError as e:
         logging.warning(f"bad request: {e}")
-        raise HTTPException(status_code=400, detail={"code": 400, "message": str(e)})
+        raise HTTPException(status_code=400, detail={"code": 400, "message": str(e)}) from e
     except Exception as e:
         logging.error(f"scrape failed: {e}")
-        raise HTTPException(status_code=500, detail={"code": 500, "message": "internal error"})
+        raise HTTPException(status_code=500, detail={"code": 500, "message": "internal error"}) from e
 
     saved = len(res.saved_files)
     failed = max(0, len(res.image_urls) - saved)
@@ -64,6 +70,7 @@ def scrape(req: ScrapeRequest, request: Request):
     logging.info(f"/scrape done url={req.url} saved={saved} failed={failed}")
     return summary
 
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):  # noqa: D401
     # Normalize HTTPException detail into ErrorResponse shape
@@ -73,6 +80,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):  # noqa:
         payload = {"code": exc.status_code, "message": str(exc.detail)}
     payload.setdefault("code", exc.status_code)
     return JSONResponse(status_code=exc.status_code, content=payload)
+
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):  # noqa: D401

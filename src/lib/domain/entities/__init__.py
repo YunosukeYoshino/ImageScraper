@@ -1,5 +1,6 @@
 """Domain entities - Core business objects."""
-from .provenance import ProvenanceEntry, QueryLogEntry, DownloadFilter, PreviewResult
+
+from .provenance import DownloadFilter, PreviewResult, ProvenanceEntry, QueryLogEntry
 
 __all__ = [
     "ProvenanceEntry",

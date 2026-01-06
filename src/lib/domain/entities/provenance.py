@@ -2,6 +2,7 @@
 
 Core domain models for image discovery and provenance tracking.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -19,14 +20,10 @@ class ProvenanceEntry(BaseModel):
     discovery_method: str = Field(..., description="SERP, sitemap, feed, etc.")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     # Relevance scoring fields
-    relevance_score: float = Field(
-        default=0.0, ge=0.0, le=1.0, description="Relevance score 0.0-1.0"
-    )
+    relevance_score: float = Field(default=0.0, ge=0.0, le=1.0, description="Relevance score 0.0-1.0")
     alt_text: Optional[str] = Field(default=None, description="Image alt attribute")
     filename: Optional[str] = Field(default=None, description="Image filename from URL")
-    context_text: Optional[str] = Field(
-        default=None, description="Surrounding text (max 200 chars)"
-    )
+    context_text: Optional[str] = Field(default=None, description="Surrounding text (max 200 chars)")
 
     def get_relevance_label(self) -> str:
         """Return human-readable relevance label."""
@@ -51,18 +48,12 @@ class QueryLogEntry(BaseModel):
 class DownloadFilter(BaseModel):
     """Filter settings for selective download."""
 
-    min_width: Optional[int] = Field(
-        default=None, description="Minimum image width in pixels"
-    )
-    min_height: Optional[int] = Field(
-        default=None, description="Minimum image height in pixels"
-    )
+    min_width: Optional[int] = Field(default=None, description="Minimum image width in pixels")
+    min_height: Optional[int] = Field(default=None, description="Minimum image height in pixels")
     allow_domains: Optional[List[str]] = Field(
         default=None, description="Whitelist domains (if set, only these allowed)"
     )
-    deny_domains: Optional[List[str]] = Field(
-        default=None, description="Blacklist domains (excluded)"
-    )
+    deny_domains: Optional[List[str]] = Field(default=None, description="Blacklist domains (excluded)")
 
 
 class PreviewResult(BaseModel):

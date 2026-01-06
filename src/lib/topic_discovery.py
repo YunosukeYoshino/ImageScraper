@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Topic-based image discovery orchestrator.
 
 Responsibilities:
@@ -11,12 +9,14 @@ Responsibilities:
 - Filter and download images (US2)
 """
 
-from typing import List, Tuple, Optional, Callable, cast
-import logging
+from __future__ import annotations
+
 import json
+import logging
 import os
 import re
 from datetime import datetime, timezone
+from typing import Callable, List, Optional, Tuple
 from urllib.parse import urlparse
 
 try:
@@ -27,34 +27,30 @@ except ImportError:
     Image = None
     HAS_PIL = False
 
-from .models_discovery import (
-    ProvenanceEntry,
-    PreviewResult,
-    QueryLogEntry,
-    DownloadFilter,
-)
-from .image_scraper import (
-    robots_allowed,
-    list_images,
-    list_images_with_metadata,
-    download_images_parallel,
-    _hash_name,
-)
 from . import search_provider
+from .image_scraper import (
+    download_images_parallel,
+    list_images_with_metadata,
+    robots_allowed,
+)
+from .models_discovery import (
+    DownloadFilter,
+    PreviewResult,
+    ProvenanceEntry,
+    QueryLogEntry,
+)
 from .rate_limit import TokenBucket
 from .relevance_scorer import (
     calculate_relevance_score,
-    extract_filename_from_url,
     extract_domain_from_url,
+    extract_filename_from_url,
 )
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_PROVIDER = "duckduckgo"
 
-_DISCOVERY_LOG_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "discovery_logs")
-)
+_DISCOVERY_LOG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "discovery_logs"))
 
 # Rate limiter for search provider (max 2 requests per second)
 _discovery_rate_limiter = TokenBucket(capacity=2, fill_rate=2.0)
@@ -92,9 +88,7 @@ def discover_topic(topic: str, limit: int = 50) -> PreviewResult:
     )
     # 1) Search pages via provider (mockable)
     try:
-        page_urls = search_provider.search_pages(
-            topic, provider=DEFAULT_PROVIDER, max_pages=20
-        )
+        page_urls = search_provider.search_pages(topic, provider=DEFAULT_PROVIDER, max_pages=20)
     except Exception as e:
         logger.warning("search_provider.error topic=%s err=%s", topic, e)
         page_urls = []
@@ -110,9 +104,7 @@ def discover_topic(topic: str, limit: int = 50) -> PreviewResult:
             continue
         try:
             # Use metadata-aware extraction for relevance scoring
-            image_metas = list_images_with_metadata(
-                page, limit=None, respect_robots=True
-            )
+            image_metas = list_images_with_metadata(page, limit=None, respect_robots=True)
         except Exception as e:
             logger.warning("list_images.failed page=%s err=%s", page, e)
             continue
@@ -215,21 +207,15 @@ def filter_entries(
         # Domain allow list (whitelist)
         if download_filter.allow_domains:
             allowed = any(
-                domain == d.lower() or domain.endswith("." + d.lower())
-                for d in download_filter.allow_domains
+                domain == d.lower() or domain.endswith("." + d.lower()) for d in download_filter.allow_domains
             )
             if not allowed:
-                logger.debug(
-                    "filter.domain_not_allowed url=%s domain=%s", image_url, domain
-                )
+                logger.debug("filter.domain_not_allowed url=%s domain=%s", image_url, domain)
                 continue
 
         # Domain deny list (blacklist)
         if download_filter.deny_domains:
-            denied = any(
-                domain == d.lower() or domain.endswith("." + d.lower())
-                for d in download_filter.deny_domains
-            )
+            denied = any(domain == d.lower() or domain.endswith("." + d.lower()) for d in download_filter.deny_domains)
             if denied:
                 logger.debug("filter.domain_denied url=%s domain=%s", image_url, domain)
                 continue
@@ -244,9 +230,7 @@ def filter_entries(
     return filtered
 
 
-def _check_image_resolution(
-    filepath: str, min_width: Optional[int], min_height: Optional[int]
-) -> bool:
+def _check_image_resolution(filepath: str, min_width: Optional[int], min_height: Optional[int]) -> bool:
     """Check if image meets minimum resolution requirements.
 
     Args:
@@ -350,9 +334,7 @@ def download_selected(
                     os.remove(filepath)
                     logger.info("resolution.removed file=%s", filepath)
                 except OSError as e:
-                    logger.warning(
-                        "resolution.remove_failed file=%s err=%s", filepath, e
-                    )
+                    logger.warning("resolution.remove_failed file=%s err=%s", filepath, e)
         saved_files = filtered_files
         logger.info(
             "resolution_filter applied=%d removed=%d",
@@ -371,9 +353,7 @@ def download_selected(
     # URL hash -> URL のマッピングを作成（堅牢な逆参照のため）
     import hashlib
 
-    url_hash_to_url = {
-        hashlib.sha256(url.encode("utf-8")).hexdigest()[:16]: url for url in image_urls
-    }
+    url_hash_to_url = {hashlib.sha256(url.encode("utf-8")).hexdigest()[:16]: url for url in image_urls}
 
     provenance_records = []
     for saved_path in saved_files:
@@ -396,9 +376,7 @@ def download_selected(
                     "source_page_url": str(entry.source_page_url),
                     "topic": entry.topic,
                     "discovery_method": entry.discovery_method,
-                    "timestamp": entry.timestamp.isoformat()
-                    if entry.timestamp
-                    else None,
+                    "timestamp": entry.timestamp.isoformat() if entry.timestamp else None,
                 }
             )
 

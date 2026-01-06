@@ -44,18 +44,20 @@ With Google Drive upload (service account) - note: drive_uploader is keyword-onl
         drive_folder="folder_id"
     )
 """
+
 from __future__ import annotations
+
+import hashlib
+import logging
+import mimetypes
 import os
 import re
 import time
-import mimetypes
-from dataclasses import dataclass
-from typing import Iterable, List, Optional, Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import logging
-import hashlib
-from urllib.parse import urlparse, urljoin
+from dataclasses import dataclass
+from typing import Callable, List, Optional
 from urllib import robotparser
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -63,6 +65,7 @@ from bs4 import BeautifulSoup
 # Import the new DriveUploader abstraction
 try:
     from src.lib.drive_uploader import DriveUploader
+
     _UPLOADER_AVAILABLE = True
 except ImportError:  # pragma: no cover
     _UPLOADER_AVAILABLE = False
@@ -72,6 +75,7 @@ except ImportError:  # pragma: no cover
 try:
     from google.oauth2 import service_account
     from googleapiclient.discovery import build
+
     _LEGACY_DRIVE_AVAILABLE = True
 except Exception:  # pragma: no cover - absence is acceptable
     _LEGACY_DRIVE_AVAILABLE = False
@@ -84,6 +88,7 @@ DEFAULT_HEADERS = {
 }
 
 IMG_EXT_PATTERN = re.compile(r"\.(?:png|jpe?g|gif|webp|svg)(?:\?.*)?$", re.IGNORECASE)
+
 
 @dataclass
 class ScrapeResult:
@@ -109,7 +114,10 @@ def _request_with_retry(url: str, retries: int = 3, backoff: float = 1.2) -> req
 
 
 def _is_image_url(url: str) -> bool:
-    return bool(IMG_EXT_PATTERN.search(url)) or url.split("?")[0].lower().endswith(tuple([".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"]))
+    if IMG_EXT_PATTERN.search(url):
+        return True
+    extensions = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg")
+    return url.split("?")[0].lower().endswith(extensions)
 
 
 def _normalize_url(src: str, base: str) -> str:
@@ -210,6 +218,7 @@ def _drive_upload(drive_service, local_path: str, parent_folder_id: Optional[str
     This function is kept for backward compatibility with existing code.
     """
     from googleapiclient.http import MediaFileUpload
+
     file_metadata = {"name": os.path.basename(local_path)}
     if parent_folder_id:
         file_metadata["parents"] = [parent_folder_id]
@@ -328,6 +337,7 @@ __all__ = [
     "download_images_parallel",
 ]
 
+
 # -- New helpers for UI preview/selective download --
 def list_images(url: str, limit: Optional[int] = None, respect_robots: bool = True) -> List[str]:
     """Return normalized image URLs from a page without downloading."""
@@ -422,6 +432,7 @@ def download_images(
 @dataclass
 class ImageMetadata:
     """Metadata extracted from an image element."""
+
     url: str
     alt: Optional[str] = None
     context: Optional[str] = None
@@ -491,7 +502,13 @@ def list_images_with_metadata(
     return results
 
 
-def download_images_parallel(image_urls: List[str], output_dir: str, max_workers: int = 8, respect_robots: bool = True, progress_cb: Optional[Callable[[int, int], None]] = None) -> List[str]:
+def download_images_parallel(
+    image_urls: List[str],
+    output_dir: str,
+    max_workers: int = 8,
+    respect_robots: bool = True,
+    progress_cb: Optional[Callable[[int, int], None]] = None,
+) -> List[str]:
     """Parallel version of download_images with progress callback.
 
     Args:
@@ -531,4 +548,3 @@ def download_images_parallel(image_urls: List[str], output_dir: str, max_workers
                 except Exception:  # pragma: no cover
                     pass
     return results
-

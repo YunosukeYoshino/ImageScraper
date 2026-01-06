@@ -2,6 +2,7 @@
 
 New code should import from src.lib.application.services instead.
 """
+
 from __future__ import annotations
 
 # Re-export from new location for backward compatibility

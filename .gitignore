@@ -12,6 +12,7 @@ venv/
 
 # uv lock / cache (keep lock file, ignore caches)
 .cache/
+.ruff_cache/
 
 # Test output / temporary dirs
 .tmp_test_out/

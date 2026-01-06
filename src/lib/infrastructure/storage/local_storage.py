@@ -1,4 +1,5 @@
 """Local file storage implementation."""
+
 from __future__ import annotations
 
 import hashlib
@@ -44,9 +45,7 @@ def download_image(url: str, dest_dir: str) -> Optional[str]:
     try:
         r = request_with_retry(url, retries=2)
         content_type = r.headers.get("Content-Type", "")
-        ext = mimetypes.guess_extension(
-            content_type.split(";")[0].strip()
-        ) or os.path.splitext(url.split("?")[0])[1]
+        ext = mimetypes.guess_extension(content_type.split(";")[0].strip()) or os.path.splitext(url.split("?")[0])[1]
         if not ext:
             ext = ".bin"
 

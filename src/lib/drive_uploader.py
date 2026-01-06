@@ -11,12 +11,14 @@ Design Principles:
 - Single Responsibility: Each class has one clear purpose
 - Interface Segregation: Minimal, focused interface for uploaders
 """
+
 from __future__ import annotations
-import os
+
 import logging
+import os
 import subprocess
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -90,16 +92,13 @@ class ServiceAccountUploader(DriveUploader):
             from googleapiclient.discovery import build
         except ImportError as e:
             raise RuntimeError(
-                "google-api-python-client not available. "
-                "Install with: pip install google-api-python-client google-auth"
+                "google-api-python-client not available. Install with: pip install google-api-python-client google-auth"
             ) from e
 
         if not os.path.exists(self.service_account_file):
             raise FileNotFoundError(f"Service account file not found: {self.service_account_file}")
 
-        creds = service_account.Credentials.from_service_account_file(
-            self.service_account_file, scopes=self.scopes
-        )
+        creds = service_account.Credentials.from_service_account_file(self.service_account_file, scopes=self.scopes)
         self._drive_service = build("drive", "v3", credentials=creds)
 
     def upload_file(self, local_path: str, remote_folder: Optional[str] = None) -> str:
@@ -127,11 +126,7 @@ class ServiceAccountUploader(DriveUploader):
             file_metadata["parents"] = [remote_folder]
 
         media = MediaFileUpload(local_path, resumable=True)
-        created = self._drive_service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields="id"
-        ).execute()
+        created = self._drive_service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
         file_id = created.get("id")
         logger.info(f"Uploaded via Service Account: {local_path} -> {file_id}")
@@ -140,8 +135,9 @@ class ServiceAccountUploader(DriveUploader):
     def is_available(self) -> bool:
         """Check if service account authentication is available."""
         try:
-            import google.oauth2.service_account
-            import googleapiclient.discovery
+            import google.oauth2.service_account  # noqa: F401
+            import googleapiclient.discovery  # noqa: F401
+
             return os.path.exists(self.service_account_file)
         except ImportError:
             return False
@@ -214,7 +210,7 @@ class RcloneUploader(DriveUploader):
                 check=True,
                 capture_output=True,
                 text=True,
-                timeout=300  # 5 minutes timeout
+                timeout=300,  # 5 minutes timeout
             )
 
             final_path = f"{remote_path}/{filename}" if remote_folder else f"{self.remote_name}:{filename}"
@@ -231,27 +227,16 @@ class RcloneUploader(DriveUploader):
             logger.error(error_msg)
             raise RuntimeError(error_msg) from e
         except subprocess.TimeoutExpired as e:
-            raise RuntimeError(f"rclone upload timeout after 300s") from e
+            raise RuntimeError("rclone upload timeout after 300s") from e
 
     def is_available(self) -> bool:
         """Check if rclone is installed and remote is configured."""
         try:
             # Check if rclone is in PATH
-            subprocess.run(
-                ["rclone", "version"],
-                check=True,
-                capture_output=True,
-                timeout=5
-            )
+            subprocess.run(["rclone", "version"], check=True, capture_output=True, timeout=5)
 
             # Check if remote exists
-            result = subprocess.run(
-                ["rclone", "listremotes"],
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
+            result = subprocess.run(["rclone", "listremotes"], check=True, capture_output=True, text=True, timeout=5)
 
             # Remote names are listed with trailing colon
             remotes = [line.strip().rstrip(":") for line in result.stdout.split("\n") if line.strip()]
@@ -292,10 +277,7 @@ class RcloneUploader(DriveUploader):
             )
 
         # Get list of files to upload
-        files = [
-            f for f in os.listdir(local_dir)
-            if os.path.isfile(os.path.join(local_dir, f))
-        ]
+        files = [f for f in os.listdir(local_dir) if os.path.isfile(os.path.join(local_dir, f))]
 
         if not files:
             return (0, [])
@@ -311,7 +293,7 @@ class RcloneUploader(DriveUploader):
                 check=True,
                 capture_output=True,
                 text=True,
-                timeout=600  # 10 minutes timeout for directory
+                timeout=600,  # 10 minutes timeout for directory
             )
 
             logger.info(f"Uploaded directory via rclone: {local_dir} -> {remote_path}")
@@ -343,9 +325,7 @@ class RcloneUploader(DriveUploader):
 
 
 def create_uploader(
-    method: str = "service_account",
-    service_account_file: Optional[str] = None,
-    rclone_remote: str = "gdrive"
+    method: str = "service_account", service_account_file: Optional[str] = None, rclone_remote: str = "gdrive"
 ) -> DriveUploader:
     """Factory function to create appropriate DriveUploader instance.
 
@@ -372,10 +352,7 @@ def create_uploader(
         return RcloneUploader(rclone_remote)
 
     else:
-        raise ValueError(
-            f"Unknown upload method: {method}. "
-            "Valid options: 'service_account', 'rclone'"
-        )
+        raise ValueError(f"Unknown upload method: {method}. Valid options: 'service_account', 'rclone'")
 
 
 __all__ = [

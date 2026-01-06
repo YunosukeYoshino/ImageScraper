@@ -1,8 +1,8 @@
 from __future__ import annotations
+
 import json
-import time
-from typing import Dict, Optional, Tuple
 import sys
+import time
 from pathlib import Path
 
 import requests
@@ -14,13 +14,13 @@ _REPO_ROOT = _THIS_FILE.parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from src.lib.ui_helpers import (
-    validate_json_text,
-    mask_headers,
+from src.lib.ui_helpers import (  # noqa: E402
     build_full_url,
     load_config,
+    mask_headers,
     save_config,
     summarize_response,
+    validate_json_text,
 )
 
 st.set_page_config(page_title="image-saver API UI", layout="wide")
@@ -30,7 +30,9 @@ st.title("image-saver API リクエストUI")
 # Load persisted config
 cfg = load_config() or {}
 base_url = st.text_input("ベースURL", value=cfg.get("base_url", "http://localhost:8000"))
-common_headers_text = st.text_area("共通ヘッダー(JSON)", value=json.dumps(cfg.get("common_headers", {}), ensure_ascii=False))
+common_headers_text = st.text_area(
+    "共通ヘッダー(JSON)", value=json.dumps(cfg.get("common_headers", {}), ensure_ascii=False)
+)
 timeout = st.number_input("タイムアウト(秒)", min_value=1, max_value=120, value=int(cfg.get("timeout", 30)))
 
 col1, col2 = st.columns(2)
@@ -50,15 +52,19 @@ ok_h, err_h = validate_json_text(headers_text)
 ok_ch, err_ch = validate_json_text(common_headers_text)
 
 errors = []
-if not ok_body: errors.append(f"本文が不正なJSONです: {err_body}")
-if not ok_q: errors.append(f"クエリが不正なJSONです: {err_q}")
-if not ok_h: errors.append(f"追加ヘッダーが不正なJSONです: {err_h}")
-if not ok_ch: errors.append(f"共通ヘッダーが不正なJSONです: {err_ch}")
+if not ok_body:
+    errors.append(f"本文が不正なJSONです: {err_body}")
+if not ok_q:
+    errors.append(f"クエリが不正なJSONです: {err_q}")
+if not ok_h:
+    errors.append(f"追加ヘッダーが不正なJSONです: {err_h}")
+if not ok_ch:
+    errors.append(f"共通ヘッダーが不正なJSONです: {err_ch}")
 
 if errors:
     st.error("\n".join(errors))
 
-colA, colB = st.columns([1,1])
+colA, colB = st.columns([1, 1])
 with colA:
     if st.button("送信", disabled=bool(errors)):
         try:

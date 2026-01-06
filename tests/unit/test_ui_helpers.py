@@ -1,16 +1,16 @@
-import os
 import json
+import os
 import tempfile
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 from src.lib.ui_helpers import (
-    validate_json_text,
-    mask_headers,
     build_full_url,
     load_config,
+    mask_headers,
     save_config,
     summarize_response,
+    validate_json_text,
 )
 
 
@@ -37,7 +37,7 @@ class TestUiHelpers(unittest.TestCase):
 
     def test_正しいJSON文字列を検証するとエラーなしで成功する(self):
         # Arrange
-        text = "{\n  \"a\": 1\n}"
+        text = '{\n  "a": 1\n}'
 
         # Act
         ok, err = validate_json_text(text)
