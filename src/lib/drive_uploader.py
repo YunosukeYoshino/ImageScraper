@@ -260,6 +260,87 @@ class RcloneUploader(DriveUploader):
         except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
             return False
 
+    def upload_directory(
+        self,
+        local_dir: str,
+        remote_folder: str,
+        delete_after: bool = False,
+        progress_cb: Optional[callable] = None,
+    ) -> tuple[int, list[str]]:
+        """Upload all files in a directory to Google Drive.
+
+        Args:
+            local_dir: Path to local directory containing files to upload
+            remote_folder: Remote path (e.g., "/n8n/ImagePost/fashion-cosme")
+            delete_after: If True, delete local files after successful upload
+            progress_cb: Optional callback(done, total) for progress updates
+
+        Returns:
+            Tuple of (success_count, list_of_failed_files)
+
+        Raises:
+            FileNotFoundError: If local_dir doesn't exist
+            RuntimeError: If rclone is not available
+        """
+        if not os.path.isdir(local_dir):
+            raise FileNotFoundError(f"Directory not found: {local_dir}")
+
+        if not self.is_available():
+            raise RuntimeError(
+                f"rclone not available or remote '{self.remote_name}' not configured. "
+                "Please run 'rclone config' to set up."
+            )
+
+        # Get list of files to upload
+        files = [
+            f for f in os.listdir(local_dir)
+            if os.path.isfile(os.path.join(local_dir, f))
+        ]
+
+        if not files:
+            return (0, [])
+
+        # Build remote path
+        remote_folder = remote_folder.lstrip("/").rstrip("/")
+        remote_path = f"{self.remote_name}:{remote_folder}"
+
+        # Execute rclone copy for entire directory
+        try:
+            result = subprocess.run(
+                ["rclone", "copy", local_dir, remote_path, "-v"],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=600  # 10 minutes timeout for directory
+            )
+
+            logger.info(f"Uploaded directory via rclone: {local_dir} -> {remote_path}")
+            if result.stderr:
+                logger.debug(f"rclone stderr: {result.stderr}")
+
+            # Delete local files if requested
+            if delete_after:
+                for f in files:
+                    file_path = os.path.join(local_dir, f)
+                    try:
+                        os.remove(file_path)
+                        logger.debug(f"Deleted local file: {file_path}")
+                    except OSError as e:
+                        logger.warning(f"Failed to delete {file_path}: {e}")
+
+            if progress_cb:
+                progress_cb(len(files), len(files))
+
+            return (len(files), [])
+
+        except subprocess.CalledProcessError as e:
+            error_msg = f"rclone upload failed: {e.stderr if e.stderr else str(e)}"
+            logger.error(error_msg)
+            return (0, files)
+        except subprocess.TimeoutExpired:
+            logger.error("rclone upload timeout after 600s")
+            return (0, files)
+
 
 def create_uploader(
     method: str = "service_account",

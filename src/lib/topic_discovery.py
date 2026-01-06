@@ -11,7 +11,7 @@ Responsibilities:
 - Filter and download images (US2)
 """
 
-from typing import List, Tuple, Optional, Callable
+from typing import List, Tuple, Optional, Callable, cast
 import logging
 import json
 import os
@@ -21,21 +21,40 @@ from urllib.parse import urlparse
 
 try:
     from PIL import Image
+
     HAS_PIL = True
 except ImportError:
+    Image = None
     HAS_PIL = False
 
-from .models_discovery import ProvenanceEntry, PreviewResult, QueryLogEntry, DownloadFilter
-from .image_scraper import robots_allowed, list_images, list_images_with_metadata, download_images_parallel, _hash_name
+from .models_discovery import (
+    ProvenanceEntry,
+    PreviewResult,
+    QueryLogEntry,
+    DownloadFilter,
+)
+from .image_scraper import (
+    robots_allowed,
+    list_images,
+    list_images_with_metadata,
+    download_images_parallel,
+    _hash_name,
+)
 from . import search_provider
 from .rate_limit import TokenBucket
-from .relevance_scorer import calculate_relevance_score, extract_filename_from_url, extract_domain_from_url
+from .relevance_scorer import (
+    calculate_relevance_score,
+    extract_filename_from_url,
+    extract_domain_from_url,
+)
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_PROVIDER = "duckduckgo"
 
-_DISCOVERY_LOG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "discovery_logs"))
+_DISCOVERY_LOG_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "discovery_logs")
+)
 
 # Rate limiter for search provider (max 2 requests per second)
 _discovery_rate_limiter = TokenBucket(capacity=2, fill_rate=2.0)
@@ -65,10 +84,17 @@ def discover_topic(topic: str, limit: int = 50) -> PreviewResult:
     - Builds ProvenanceEntry list up to `limit`
     - Writes deterministic query log to discovery_logs
     """
-    logger.info("discover_topic.start topic=%s limit=%d provider=%s", topic, limit, DEFAULT_PROVIDER)
+    logger.info(
+        "discover_topic.start topic=%s limit=%d provider=%s",
+        topic,
+        limit,
+        DEFAULT_PROVIDER,
+    )
     # 1) Search pages via provider (mockable)
     try:
-        page_urls = search_provider.search_pages(topic, provider=DEFAULT_PROVIDER, max_pages=20)
+        page_urls = search_provider.search_pages(
+            topic, provider=DEFAULT_PROVIDER, max_pages=20
+        )
     except Exception as e:
         logger.warning("search_provider.error topic=%s err=%s", topic, e)
         page_urls = []
@@ -84,7 +110,9 @@ def discover_topic(topic: str, limit: int = 50) -> PreviewResult:
             continue
         try:
             # Use metadata-aware extraction for relevance scoring
-            image_metas = list_images_with_metadata(page, limit=None, respect_robots=True)
+            image_metas = list_images_with_metadata(
+                page, limit=None, respect_robots=True
+            )
         except Exception as e:
             logger.warning("list_images.failed page=%s err=%s", page, e)
             continue
@@ -161,6 +189,7 @@ def discover_topic(topic: str, limit: int = 50) -> PreviewResult:
 # US2: Filtering & Selective Download
 # ---------------------------------------------------------------------------
 
+
 def filter_entries(
     entries: List[ProvenanceEntry],
     download_filter: Optional[DownloadFilter] = None,
@@ -190,7 +219,9 @@ def filter_entries(
                 for d in download_filter.allow_domains
             )
             if not allowed:
-                logger.debug("filter.domain_not_allowed url=%s domain=%s", image_url, domain)
+                logger.debug(
+                    "filter.domain_not_allowed url=%s domain=%s", image_url, domain
+                )
                 continue
 
         # Domain deny list (blacklist)
@@ -213,7 +244,9 @@ def filter_entries(
     return filtered
 
 
-def _check_image_resolution(filepath: str, min_width: Optional[int], min_height: Optional[int]) -> bool:
+def _check_image_resolution(
+    filepath: str, min_width: Optional[int], min_height: Optional[int]
+) -> bool:
     """Check if image meets minimum resolution requirements.
 
     Args:
@@ -235,10 +268,20 @@ def _check_image_resolution(filepath: str, min_width: Optional[int], min_height:
         with Image.open(filepath) as img:
             width, height = img.size
             if min_width is not None and width < min_width:
-                logger.debug("resolution.reject width=%d < min_width=%d file=%s", width, min_width, filepath)
+                logger.debug(
+                    "resolution.reject width=%d < min_width=%d file=%s",
+                    width,
+                    min_width,
+                    filepath,
+                )
                 return False
             if min_height is not None and height < min_height:
-                logger.debug("resolution.reject height=%d < min_height=%d file=%s", height, min_height, filepath)
+                logger.debug(
+                    "resolution.reject height=%d < min_height=%d file=%s",
+                    height,
+                    min_height,
+                    filepath,
+                )
                 return False
             return True
     except Exception as e:
@@ -253,8 +296,9 @@ def download_selected(
     max_workers: int = 8,
     respect_robots: bool = True,
     progress_cb: Optional[Callable[[int, int], None]] = None,
-) -> Tuple[List[str], str]:
-    """Download selected images and write provenance_index.json.
+    write_provenance_index: bool = False,
+) -> Tuple[List[str], Optional[str]]:
+    """Download selected images and optionally write provenance_index.json.
 
     Args:
         entries: List of ProvenanceEntry to download.
@@ -263,20 +307,22 @@ def download_selected(
         max_workers: Parallel download workers.
         respect_robots: Skip images disallowed by robots.txt.
         progress_cb: Optional progress callback(done, total).
+        write_provenance_index: Whether to write provenance_index.json.
 
     Returns:
-        Tuple of (list of saved file paths, path to provenance_index.json).
+        Tuple of (list of saved file paths, path to provenance_index.json or None).
     """
     # Apply domain filters
     filtered_entries = filter_entries(entries, download_filter)
     if not filtered_entries:
         logger.warning("download_selected: no entries after filtering")
-        # Still write empty provenance index
-        os.makedirs(output_dir, exist_ok=True)
-        index_path = os.path.join(output_dir, "provenance_index.json")
-        with open(index_path, "w", encoding="utf-8") as f:
-            json.dump({"entries": [], "total": 0}, f, ensure_ascii=False, indent=2)
-        return [], index_path
+        if write_provenance_index:
+            os.makedirs(output_dir, exist_ok=True)
+            index_path = os.path.join(output_dir, "provenance_index.json")
+            with open(index_path, "w", encoding="utf-8") as f:
+                json.dump({"entries": [], "total": 0}, f, ensure_ascii=False, indent=2)
+            return [], index_path
+        return [], None
 
     image_urls = [str(e.image_url) for e in filtered_entries]
 
@@ -304,19 +350,29 @@ def download_selected(
                     os.remove(filepath)
                     logger.info("resolution.removed file=%s", filepath)
                 except OSError as e:
-                    logger.warning("resolution.remove_failed file=%s err=%s", filepath, e)
+                    logger.warning(
+                        "resolution.remove_failed file=%s err=%s", filepath, e
+                    )
         saved_files = filtered_files
-        logger.info("resolution_filter applied=%d removed=%d", files_before, files_before - len(saved_files))
+        logger.info(
+            "resolution_filter applied=%d removed=%d",
+            files_before,
+            files_before - len(saved_files),
+        )
+
+    if not write_provenance_index:
+        return saved_files, None
 
     # Build provenance index mapping filename -> provenance
+
     # Clean Architecture: 実際に保存されたファイルから逆マッピングして正確なファイル名を取得
     url_to_entry = {str(e.image_url): e for e in filtered_entries}
 
     # URL hash -> URL のマッピングを作成（堅牢な逆参照のため）
     import hashlib
+
     url_hash_to_url = {
-        hashlib.sha256(url.encode("utf-8")).hexdigest()[:16]: url
-        for url in image_urls
+        hashlib.sha256(url.encode("utf-8")).hexdigest()[:16]: url for url in image_urls
     }
 
     provenance_records = []
@@ -333,14 +389,18 @@ def download_selected(
 
         entry = url_to_entry.get(original_url)
         if entry:
-            provenance_records.append({
-                "filename": filename,
-                "image_url": str(entry.image_url),
-                "source_page_url": str(entry.source_page_url),
-                "topic": entry.topic,
-                "discovery_method": entry.discovery_method,
-                "timestamp": entry.timestamp.isoformat() if entry.timestamp else None,
-            })
+            provenance_records.append(
+                {
+                    "filename": filename,
+                    "image_url": str(entry.image_url),
+                    "source_page_url": str(entry.source_page_url),
+                    "topic": entry.topic,
+                    "discovery_method": entry.discovery_method,
+                    "timestamp": entry.timestamp.isoformat()
+                    if entry.timestamp
+                    else None,
+                }
+            )
 
     # Write provenance_index.json
     os.makedirs(output_dir, exist_ok=True)
@@ -353,11 +413,17 @@ def download_selected(
             "deny_domains": download_filter.deny_domains if download_filter else None,
             "min_width": download_filter.min_width if download_filter else None,
             "min_height": download_filter.min_height if download_filter else None,
-        } if download_filter else None,
+        }
+        if download_filter
+        else None,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
     with open(index_path, "w", encoding="utf-8") as f:
         json.dump(index_data, f, ensure_ascii=False, indent=2)
-    logger.info("provenance_index.written path=%s entries=%d", index_path, len(provenance_records))
+    logger.info(
+        "provenance_index.written path=%s entries=%d",
+        index_path,
+        len(provenance_records),
+    )
 
     return saved_files, index_path

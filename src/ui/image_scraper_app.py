@@ -17,6 +17,38 @@ from src.lib.image_scraper import scrape_images
 from src.lib.topic_discovery import discover_topic, download_selected, filter_entries
 from src.lib.models_discovery import DownloadFilter, ProvenanceEntry
 from src.lib import image_scraper as scraper
+from src.lib.drive_uploader import RcloneUploader
+
+# --- Google Drive履歴管理 ---
+GDRIVE_HISTORY_FILE = Path.home() / ".image_saver_gdrive_history.json"
+MAX_HISTORY = 10
+
+
+def load_gdrive_history() -> list[str]:
+    """履歴ファイルからGoogle Driveパス履歴を読み込む"""
+    if GDRIVE_HISTORY_FILE.exists():
+        try:
+            with open(GDRIVE_HISTORY_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data.get("paths", [])[:MAX_HISTORY]
+        except (json.JSONDecodeError, OSError):
+            pass
+    return []
+
+
+def save_gdrive_history(new_path: str) -> None:
+    """新しいパスを履歴の先頭に追加して保存"""
+    history = load_gdrive_history()
+    # 重複を除去して先頭に追加
+    if new_path in history:
+        history.remove(new_path)
+    history.insert(0, new_path)
+    history = history[:MAX_HISTORY]
+    try:
+        with open(GDRIVE_HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump({"paths": history}, f, ensure_ascii=False, indent=2)
+    except OSError:
+        pass
 
 
 st.set_page_config(page_title="image-saver | 画像スクレイパー", layout="centered")
@@ -255,5 +287,77 @@ if preview_urls:
                             file_name=dl_filename,
                             mime="application/zip"
                         )
+
+                        # Store download info for Google Drive upload
+                        st.session_state["last_download_dir"] = output_dir.strip()
+                        st.session_state["last_download_count"] = len(paths)
+
                 except Exception as e:
                     st.error(f"ダウンロードに失敗しました: {e}")
+
+# --- Google Drive アップロードセクション ---
+if st.session_state.get("last_download_dir") and st.session_state.get("last_download_count", 0) > 0:
+    st.divider()
+    st.subheader("Google Drive にアップロード")
+
+    # Check rclone availability
+    uploader = RcloneUploader("gdrive")
+    if not uploader.is_available():
+        st.warning("rclone が設定されていません。ターミナルで `rclone config` を実行して gdrive リモートを設定してください。")
+    else:
+        # Load history
+        gdrive_history = load_gdrive_history()
+
+        # Initialize session state for gdrive path (only once)
+        if "gdrive_path_input" not in st.session_state:
+            st.session_state["gdrive_path_input"] = ""
+
+        col_path, col_hist = st.columns([3, 1])
+        with col_hist:
+            if gdrive_history:
+                history_options = ["（直接入力）"] + gdrive_history
+                selected_idx = st.selectbox(
+                    "履歴から選択",
+                    options=range(len(history_options)),
+                    format_func=lambda i: history_options[i],
+                    index=0,
+                    help="過去に使用したパス"
+                )
+                if selected_idx > 0:
+                    # 履歴から選択された場合、入力欄に反映
+                    st.session_state["gdrive_path_input"] = history_options[selected_idx]
+
+        with col_path:
+            gdrive_path = st.text_input(
+                "アップロード先パス",
+                placeholder="/n8n/ImagePost/fashion-cosme",
+                help="例: /n8n/ImagePost/fashion-cosme",
+                key="gdrive_path_input"
+            )
+
+        upload_dir = st.session_state.get("last_download_dir", "")
+        file_count = st.session_state.get("last_download_count", 0)
+        st.caption(f"対象: {upload_dir} ({file_count}枚)")
+
+        if st.button("Google Drive にアップロード", type="primary"):
+            if not gdrive_path.strip():
+                st.error("アップロード先パスを入力してください。")
+            else:
+                with st.spinner("Google Drive にアップロード中..."):
+                    try:
+                        success_count, failed_files = uploader.upload_directory(
+                            local_dir=upload_dir,
+                            remote_folder=gdrive_path.strip(),
+                            delete_after=True
+                        )
+
+                        if not failed_files:
+                            st.success(f"{success_count}枚をアップロード完了。ローカル画像を削除しました。")
+                            save_gdrive_history(gdrive_path.strip())
+                            # Clear session state
+                            st.session_state.pop("last_download_dir", None)
+                            st.session_state.pop("last_download_count", None)
+                        else:
+                            st.warning(f"{len(failed_files)}枚がアップロード失敗: {', '.join(failed_files[:5])}")
+                    except Exception as e:
+                        st.error(f"アップロード失敗: {e}")
