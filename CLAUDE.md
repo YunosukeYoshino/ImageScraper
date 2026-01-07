@@ -36,6 +36,16 @@ CLI: `uv run image-scrape --help`
 | `python-patterns.md` | `*.py` | 型ヒント、import順序、エラーハンドリング |
 | `development-workflow.md` | `*` | **コマンド一覧**、品質チェック、Git、テスト規約 |
 
+## Skills
+
+スキルは `.claude/skills/` に配置され、Claudeが自動的に判断して使用する。
+
+| スキル | 説明 | 適用場面 |
+|--------|------|----------|
+| `modern-python-stack` | uv, Ruff, tyによるモダンPython開発 | プロジェクト作成、依存管理、品質改善 |
+| `ty-pro` | Python型安全性の強化 | 型アノテーション追加、型エラー修正 |
+| `tdd` | t.wada流TDD | 新機能実装、バグ修正、リファクタリング |
+
 ## Architecture
 
 ```

@@ -55,23 +55,26 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Callable, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, List, Optional
 from urllib import robotparser
 from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
 
+if TYPE_CHECKING:
+    from src.lib.drive_uploader import DriveUploader
+
 # Import the new DriveUploader abstraction
 try:
-    from src.lib.drive_uploader import DriveUploader
+    from src.lib.drive_uploader import DriveUploader as _DriveUploader
 
     _UPLOADER_AVAILABLE = True
 except ImportError:  # pragma: no cover
     _UPLOADER_AVAILABLE = False
-    DriveUploader = None  # type: ignore
+    _DriveUploader: Any = None
 
-# Legacy imports for backward compatibility
+# Legacy imports for backward compatibility (optional dependency)
 try:
     from google.oauth2 import service_account  # ty: ignore[unresolved-import]
     from googleapiclient.discovery import build  # ty: ignore[unresolved-import]
@@ -125,8 +128,10 @@ def _normalize_url(src: str, base: str) -> str:
         return "https:" + src
     if src.startswith("http://") or src.startswith("https://"):
         return src
-    # relative path
-    return requests.compat.urljoin(base, src)  # ty: ignore[possibly-missing-attribute]
+    # relative path - use stdlib urljoin instead of requests.compat
+    from urllib.parse import urljoin
+
+    return urljoin(base, src)
 
 
 def _robots_allowed(target_url: str, user_agent: str = DEFAULT_HEADERS["User-Agent"]) -> bool:

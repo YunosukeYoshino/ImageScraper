@@ -19,9 +19,15 @@ import logging
 import os
 import subprocess
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional
+
+if TYPE_CHECKING:
+    pass
 
 logger = logging.getLogger(__name__)
+
+# Type aliases for optional dependencies
+_DriveService = Any  # googleapiclient.discovery.Resource at runtime
 
 
 class DriveUploader(ABC):
