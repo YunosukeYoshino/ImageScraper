@@ -48,7 +48,6 @@ src/
 ├── ui/            # Streamlit UI（詳細: src/ui/README.md）
 └── cli/           # CLIエントリポイント
 tests/unit/        # ユニットテスト（モック使用）
-.specify/          # プロジェクト仕様・憲章
 ```
 
 **依存方向**: domain ← application ← infrastructure

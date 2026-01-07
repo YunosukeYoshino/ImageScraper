@@ -1,315 +1,127 @@
 ---
 name: modern-python-stack
-description: Astral社製ツール（uv, Ruff, ty）を中心としたモダンPython開発環境。新規プロジェクト作成、依存関係管理、コード品質改善、CI/CD設定時に自動適用。高速・堅牢な開発ワークフローを実現。
+description: Astral社製ツール（uv, Ruff, ty）でPython開発環境を構築。プロジェクト作成、依存関係管理、コード品質改善、CI/CD設定時に使用。
 ---
 
-# Modern Python Stack Rules
+# Modern Python Stack
 
-Astral社製ツールを中心とした高速・堅牢なPython開発環境ガイドライン。
+Astral社製Rustツールを中心とした高速Python開発環境。
 
-## 技術スタック概要
+## 技術スタック
 
-| カテゴリ | ツール | 特徴 |
+| カテゴリ | ツール | 用途 |
 |---------|--------|------|
-| パッケージ管理 | **uv** | Rust製、pip比10-100倍高速 |
-| リンター/フォーマッター | **Ruff** | Rust製、極めて高速、設定一元管理 |
-| 型チェッカー | **ty** | Astral社製、mypy比大幅高速化 |
-| 依存性制御 | **import-linter** | アーキテクチャ境界の強制 |
-| タスク自動化 | **Taskfile** | YAMLベース、可読性重視 |
+| パッケージ管理 | **uv** | pip代替（10-100倍高速） |
+| リンター/フォーマッター | **Ruff** | flake8/black/isort統合 |
+| 型チェッカー | **ty** | mypy代替（約7倍高速） |
+| 依存性制御 | **import-linter** | アーキテクチャ境界強制 |
 | コミット前チェック | **pre-commit** | 自動品質担保 |
 
-## 適用場面
+## 🔄 セットアップワークフロー
 
-- 新規Pythonプロジェクトのセットアップ時
-- 依存関係の追加・管理時
-- コード品質改善の提案時
-- CI/CD設定の構築時
-- リファクタリング時
+新規プロジェクト作成時はこのチェックリストで進捗を追跡：
 
----
+```
+セットアップ進捗:
+- [ ] Step 1: uv初期化
+- [ ] Step 2: 開発依存追加
+- [ ] Step 3: Ruff設定
+- [ ] Step 4: pre-commit設定
+- [ ] Step 5: 動作確認
+```
 
-## 1. パッケージ管理: uv
-
-### 原則
-- 【MUST】`uv`をパッケージ管理に使用
-- 【MUST】`pyproject.toml`で依存関係を一元管理
-- 【SHOULD】`uv.lock`をgitにコミット（再現性確保）
-
-### コマンド
+**Step 1: uv初期化**
 ```bash
-# 環境セットアップ
+uv init
 uv sync
+```
 
-# パッケージ追加
-uv add requests
-uv add --dev pytest
+**Step 2: 開発依存追加**
+```bash
+uv add --dev ruff ty pre-commit pytest
+```
 
-# スクリプト実行
-uv run python script.py
+**Step 3: Ruff設定（pyproject.tomlに追加）**
+```toml
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+force-single-line = true
+```
+
+**Step 4: pre-commit設定**
+```bash
+uv run pre-commit install
+```
+
+**Step 5: 動作確認**
+```bash
+uv run ruff check .
+uv run ty check src/
 uv run pytest
 ```
 
-### CUDA対応設定
-```toml
-[project]
-dependencies = ["torch==2.1.2"]
-
-[tool.uv.sources]
-torch = [{ index = "pytorch-cuda", marker = "platform_system == 'Linux'" }]
-
-[[tool.uv.index]]
-name = "pytorch-cuda"
-url = "https://download.pytorch.org/whl/cu121"
-explicit = true
-```
+確認が失敗した場合は、Step 3に戻って設定を修正。
 
 ---
 
-## 2. リンター/フォーマッター: Ruff
+## コマンドリファレンス
 
-### 原則
-- 【MUST】行長は`120`文字
-- 【MUST】importは`force-single-line = true`（マージコンフリクト防止）
-- 【SHOULD】`pyproject.toml`で設定を一元管理
-
-### 推奨設定
-```toml
-[tool.ruff]
-line-length = 120
-target-version = "py311"
-src = ["src", "tests"]
-
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-
-[tool.ruff.lint]
-select = [
-    "A",    # flake8-builtins
-    "B",    # flake8-bugbear
-    "E",    # pycodestyle errors
-    "F",    # Pyflakes
-    "I",    # isort
-    "N",    # pep8-naming
-    "W",    # pycodestyle warnings
-    "PL",   # Pylint
-    "UP",   # pyupgrade
-]
-ignore = [
-    "B905",     # zip-without-explicit-strict
-    "F403",     # star-imports
-    "N812",     # lowercase-imported-as-non-lowercase
-    "N999",     # invalid-module-name
-    "PLR0912",  # too-many-branches
-    "PLR0913",  # too-many-arguments
-]
-
-[tool.ruff.lint.isort]
-force-single-line = true
-known-first-party = ["src"]
-```
-
-### コマンド
+### uv（パッケージ管理）
 ```bash
-uv run ruff check .          # リント
-uv run ruff check --fix .    # 自動修正
-uv run ruff format .         # フォーマット
+uv sync                    # 依存同期
+uv add package             # 追加
+uv add --dev package       # 開発依存追加
+uv run script.py           # 実行（常にuv run経由）
 ```
 
----
-
-## 3. 型チェッカー: ty
-
-### 原則
-- 【SHOULD】`ty`を型チェックに使用（mypy比で大幅高速化）
-- 【MAY】段階的に型アノテーションを追加
-
-### セットアップ
+### Ruff（リント/フォーマット）
 ```bash
-uv add --dev ty
-uv run ty check src/
+uv run ruff check .        # リント
+uv run ruff check --fix .  # 自動修正
+uv run ruff format .       # フォーマット
 ```
 
----
-
-## 4. 依存性制御: import-linter
-
-### 原則
-- 【SHOULD】レイヤードアーキテクチャの境界をコードで強制
-- 【MUST】依存方向: `infrastructure → adapters → use_cases → entities`
-
-### 設定例
-```toml
-[tool.importlinter]
-root_packages = ["src"]
-
-[[tool.importlinter.contracts]]
-name = "Layered architecture contract"
-type = "layers"
-layers = ["infrastructure", "adapters", "use_cases", "entities"]
-```
-
-### Clean Architectureの場合
-```toml
-[[tool.importlinter.contracts]]
-name = "Clean Architecture contract"
-type = "layers"
-layers = ["infrastructure", "application", "domain"]
-```
-
-### コマンド
+### ty（型チェック）
 ```bash
-uv run lint-imports
+uv run ty check src/       # 型チェック
 ```
+
+エラー抑制: `# ty: ignore[rule-name]`
 
 ---
 
-## 5. タスク自動化: Taskfile
+## 原則
 
-### 原則
-- 【SHOULD】`Taskfile.yaml`でタスクを定義（Makefileより可読性向上）
-- 【MUST】各タスクに`desc`で説明を付与
+### 【MUST】必須
+- `uv`をパッケージ管理に使用（pip禁止）
+- `pyproject.toml`で依存関係を一元管理
+- 行長は`120`文字
+- importは`force-single-line = true`
+- `pre-commit`をセットアップ
 
-### Taskfile.yaml テンプレート
-```yaml
-version: '3'
-
-tasks:
-  default:
-    desc: Show available tasks
-    cmds:
-      - task --list
-
-  setup:
-    desc: Setup development environment
-    cmds:
-      - uv sync
-      - uv run pre-commit install
-
-  lint:
-    desc: Run linter
-    cmds:
-      - uv run ruff check .
-
-  format:
-    desc: Format code
-    cmds:
-      - uv run ruff format .
-
-  type-check:
-    desc: Run type checker
-    cmds:
-      - uv run ty check src/
-
-  test:
-    desc: Run tests
-    cmds:
-      - uv run pytest
-
-  check:
-    desc: Run all checks
-    cmds:
-      - task: lint
-      - task: type-check
-      - task: test
-```
+### 【SHOULD】推奨
+- `uv.lock`をgitにコミット（再現性確保）
+- `ty`を型チェックに使用
+- アーキテクチャ境界を`import-linter`で強制
 
 ---
 
-## 6. コミット前チェック: pre-commit
+## Anti-Patterns
 
-### 原則
-- 【MUST】`pre-commit`をセットアップ
-- 【MUST】Ruffをフック登録
-
-### .pre-commit-config.yaml
-```yaml
-repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.0
-    hooks:
-      - id: ruff
-        args: [--fix]
-      - id: ruff-format
-
-  - repo: local
-    hooks:
-      - id: import-linter
-        name: import-linter
-        entry: uv run lint-imports
-        language: system
-        pass_filenames: false
-        types: [python]
-```
-
----
-
-## pyproject.toml テンプレート
-
-```toml
-[project]
-name = "your-project"
-version = "0.1.0"
-description = "Your project description"
-requires-python = ">=3.11"
-dependencies = []
-
-[project.optional-dependencies]
-dev = [
-    "pre-commit>=3.7.0",
-    "ruff>=0.9.0",
-    "ty>=0.0.1a0",
-    "import-linter>=2.0.0",
-    "pytest>=8.0.0",
-]
-
-[tool.ruff]
-line-length = 120
-target-version = "py311"
-src = ["src", "tests"]
-
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-
-[tool.ruff.lint]
-select = ["A", "B", "E", "F", "I", "N", "W", "PL", "UP"]
-ignore = ["B905", "F403", "N812", "N999", "PLR0912", "PLR0913"]
-
-[tool.ruff.lint.isort]
-force-single-line = true
-known-first-party = ["src"]
-
-[tool.importlinter]
-root_packages = ["src"]
-
-[[tool.importlinter.contracts]]
-name = "Clean Architecture contract"
-type = "layers"
-layers = ["infrastructure", "application", "domain"]
-
-[tool.uv]
-# Minimal uv configuration
-```
-
----
-
-## Checklist
-
-プロジェクトセットアップ時の確認項目:
-
-- [ ] uvがインストールされている
-- [ ] pyproject.tomlにRuff設定がある
-- [ ] pre-commit hookが有効化されている
-- [ ] import-linter契約が定義されている（アーキテクチャ強制時）
-- [ ] Taskfile.yamlがある（タスク自動化時）
-- [ ] CIでruff check/format/tyが実行される
+- ❌ `pip install`の使用
+- ❌ `python script.py`の直接実行（`uv run`経由で）
+- ❌ 複数の設定ファイル（`.flake8`, `.isort.cfg`等）→ pyproject.tomlに統合
 
 ## References
 
+詳細設定は以下を参照:
+- [REFERENCE.md](REFERENCE.md) - 設定テンプレート、CUDA対応、import-linter
 - [uv Documentation](https://docs.astral.sh/uv/)
 - [Ruff Documentation](https://docs.astral.sh/ruff/)
 - [ty (Astral)](https://github.com/astral-sh/ty)
-- [import-linter](https://import-linter.readthedocs.io/)
-- [Taskfile](https://taskfile.dev/)
-- [pre-commit](https://pre-commit.com/)

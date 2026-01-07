@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 try:
     from src.api.app import app
 except Exception:
-    app = None
+    app = None  # type: ignore[assignment]
 
 
 class TestAPI(TestCase):

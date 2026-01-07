@@ -14,6 +14,7 @@ Design Principles:
 
 from __future__ import annotations
 
+import collections.abc
 import logging
 import os
 import subprocess
@@ -88,8 +89,8 @@ class ServiceAccountUploader(DriveUploader):
             return
 
         try:
-            from google.oauth2 import service_account
-            from googleapiclient.discovery import build
+            from google.oauth2 import service_account  # ty: ignore[unresolved-import]
+            from googleapiclient.discovery import build  # ty: ignore[unresolved-import]
         except ImportError as e:
             raise RuntimeError(
                 "google-api-python-client not available. Install with: pip install google-api-python-client google-auth"
@@ -117,7 +118,7 @@ class ServiceAccountUploader(DriveUploader):
         self._init_service()
 
         try:
-            from googleapiclient.http import MediaFileUpload
+            from googleapiclient.http import MediaFileUpload  # ty: ignore[unresolved-import]
         except ImportError as e:
             raise RuntimeError("googleapiclient not available") from e
 
@@ -126,6 +127,7 @@ class ServiceAccountUploader(DriveUploader):
             file_metadata["parents"] = [remote_folder]
 
         media = MediaFileUpload(local_path, resumable=True)
+        assert self._drive_service is not None  # Guaranteed by _init_service()
         created = self._drive_service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
         file_id = created.get("id")
@@ -135,8 +137,8 @@ class ServiceAccountUploader(DriveUploader):
     def is_available(self) -> bool:
         """Check if service account authentication is available."""
         try:
-            import google.oauth2.service_account  # noqa: F401
-            import googleapiclient.discovery  # noqa: F401
+            import google.oauth2.service_account  # noqa: F401  # ty: ignore[unresolved-import]
+            import googleapiclient.discovery  # noqa: F401  # ty: ignore[unresolved-import]
 
             return os.path.exists(self.service_account_file)
         except ImportError:
@@ -250,7 +252,7 @@ class RcloneUploader(DriveUploader):
         local_dir: str,
         remote_folder: str,
         delete_after: bool = False,
-        progress_cb: Optional[callable] = None,
+        progress_cb: "collections.abc.Callable[[int, int], None] | None" = None,
     ) -> tuple[int, list[str]]:
         """Upload all files in a directory to Google Drive.
 

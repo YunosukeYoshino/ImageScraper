@@ -84,7 +84,8 @@ def extract_images(
         if not src:
             continue
 
-        full_url = _normalize_url(src.strip(), base_url)
+        src_val = src if isinstance(src, str) else str(src)
+        full_url = _normalize_url(src_val.strip(), base_url)
         if full_url in seen:
             continue
         seen.add(full_url)
@@ -93,7 +94,8 @@ def extract_images(
             continue
 
         if with_metadata:
-            alt = img.get("alt", "").strip() or None
+            alt_attr = img.get("alt", "")
+            alt = (alt_attr if isinstance(alt_attr, str) else str(alt_attr)).strip() or None
             context = _extract_context_text(img)
             results.append(ImageMetadata(url=full_url, alt=alt, context=context))
         else:

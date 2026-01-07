@@ -73,8 +73,8 @@ except ImportError:  # pragma: no cover
 
 # Legacy imports for backward compatibility
 try:
-    from google.oauth2 import service_account
-    from googleapiclient.discovery import build
+    from google.oauth2 import service_account  # ty: ignore[unresolved-import]
+    from googleapiclient.discovery import build  # ty: ignore[unresolved-import]
 
     _LEGACY_DRIVE_AVAILABLE = True
 except Exception:  # pragma: no cover - absence is acceptable
@@ -126,7 +126,7 @@ def _normalize_url(src: str, base: str) -> str:
     if src.startswith("http://") or src.startswith("https://"):
         return src
     # relative path
-    return requests.compat.urljoin(base, src)
+    return requests.compat.urljoin(base, src)  # ty: ignore[possibly-missing-attribute]
 
 
 def _robots_allowed(target_url: str, user_agent: str = DEFAULT_HEADERS["User-Agent"]) -> bool:
@@ -217,7 +217,7 @@ def _drive_upload(drive_service, local_path: str, parent_folder_id: Optional[str
 
     This function is kept for backward compatibility with existing code.
     """
-    from googleapiclient.http import MediaFileUpload
+    from googleapiclient.http import MediaFileUpload  # ty: ignore[unresolved-import]
 
     file_metadata = {"name": os.path.basename(local_path)}
     if parent_folder_id:
@@ -280,7 +280,8 @@ def scrape_images(
         src = img.get("src") or img.get("data-src") or img.get("data-original")
         if not src:
             continue
-        raw_sources.append(src.strip())
+        src_val = src if isinstance(src, str) else str(src)
+        raw_sources.append(src_val.strip())
 
     # Deduplicate and normalize
     normalized: List[str] = []
@@ -350,7 +351,8 @@ def list_images(url: str, limit: Optional[int] = None, respect_robots: bool = Tr
         src = img.get("src") or img.get("data-src") or img.get("data-original")
         if not src:
             continue
-        raw_sources.append(src.strip())
+        src_val = src if isinstance(src, str) else str(src)
+        raw_sources.append(src_val.strip())
 
     normalized: List[str] = []
     seen = set()
@@ -482,7 +484,8 @@ def list_images_with_metadata(
         if not src:
             continue
 
-        full_url = _normalize_url(src.strip(), url)
+        src_val = src if isinstance(src, str) else str(src)
+        full_url = _normalize_url(src_val.strip(), url)
         if full_url in seen:
             continue
         seen.add(full_url)
@@ -491,7 +494,8 @@ def list_images_with_metadata(
             continue
 
         # Extract metadata
-        alt = img.get("alt", "").strip() or None
+        alt_attr = img.get("alt", "")
+        alt = (alt_attr if isinstance(alt_attr, str) else str(alt_attr)).strip() or None
         context = _extract_context_text(img)
 
         results.append(ImageMetadata(url=full_url, alt=alt, context=context))

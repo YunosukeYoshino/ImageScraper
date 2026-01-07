@@ -101,7 +101,7 @@ with colB:
                 "common_headers": json.loads(common_headers_text) if common_headers_text.strip() else {},
                 "timeout": int(timeout),
             }
-            save_config(cfg)
+            save_config(cfg)  # ty: ignore[invalid-argument-type]
             st.success("設定を保存しました")
         except Exception as e:
             st.error(f"設定保存に失敗しました: {e}")

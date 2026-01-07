@@ -147,8 +147,8 @@ class TestFilterEntries(unittest.TestCase):
     def _make_entry(self, image_url: str, source_page_url: str = "https://example.com/") -> ProvenanceEntry:
         return ProvenanceEntry(
             topic="test",
-            source_page_url=source_page_url,
-            image_url=image_url,
+            source_page_url=source_page_url,  # type: ignore[arg-type]
+            image_url=image_url,  # type: ignore[arg-type]
             discovery_method="SERP",
         )
 
@@ -206,8 +206,8 @@ class TestDownloadSelected(unittest.TestCase):
     def _make_entry(self, image_url: str) -> ProvenanceEntry:
         return ProvenanceEntry(
             topic="test",
-            source_page_url="https://example.com/",
-            image_url=image_url,
+            source_page_url="https://example.com/",  # type: ignore[arg-type]
+            image_url=image_url,  # type: ignore[arg-type]
             discovery_method="SERP",
         )
 
@@ -241,9 +241,10 @@ class TestDownloadSelected(unittest.TestCase):
             saved, index_path = download_selected(entries, tmpdir, write_provenance_index=True)
 
             self.assertEqual(len(saved), 2)
-            self.assertTrue(os.path.exists(index_path))
+            self.assertIsNotNone(index_path)
+            self.assertTrue(os.path.exists(index_path))  # type: ignore[arg-type]
 
-            with open(index_path, "r") as f:
+            with open(index_path, "r") as f:  # type: ignore[arg-type]
                 index_data = json.load(f)
 
             self.assertIn("entries", index_data)
@@ -276,9 +277,10 @@ class TestDownloadSelected(unittest.TestCase):
             saved, index_path = download_selected([], tmpdir, write_provenance_index=True)
 
             self.assertEqual(saved, [])
-            self.assertTrue(os.path.exists(index_path))
+            self.assertIsNotNone(index_path)
+            self.assertTrue(os.path.exists(index_path))  # type: ignore[arg-type]
 
-            with open(index_path, "r") as f:
+            with open(index_path, "r") as f:  # type: ignore[arg-type]
                 index_data = json.load(f)
 
             self.assertEqual(index_data["entries"], [])
@@ -291,8 +293,8 @@ class TestResolutionFilter(unittest.TestCase):
     def _make_entry(self, image_url: str) -> ProvenanceEntry:
         return ProvenanceEntry(
             topic="test",
-            source_page_url="https://example.com/",
-            image_url=image_url,
+            source_page_url="https://example.com/",  # type: ignore[arg-type]
+            image_url=image_url,  # type: ignore[arg-type]
             discovery_method="SERP",
         )
 

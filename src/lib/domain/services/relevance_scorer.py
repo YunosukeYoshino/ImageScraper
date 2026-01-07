@@ -104,7 +104,7 @@ def calculate_relevance_score(
     return max(0.0, min(1.0, total))
 
 
-def extract_filename_from_url(url: str) -> Optional[str]:
+def extract_filename_from_url(url: str | None) -> Optional[str]:
     """Extract filename from image URL."""
     if not url:
         return None
@@ -122,7 +122,7 @@ def extract_filename_from_url(url: str) -> Optional[str]:
         return None
 
 
-def extract_domain_from_url(url: str) -> Optional[str]:
+def extract_domain_from_url(url: str | None) -> Optional[str]:
     """Extract domain from URL."""
     if not url:
         return None

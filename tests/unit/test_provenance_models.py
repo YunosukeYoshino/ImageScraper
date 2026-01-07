@@ -8,8 +8,8 @@ class TestProvenanceModels(unittest.TestCase):
     def test_provenance_entry_fields(self):
         entry = ProvenanceEntry(
             topic="富士山",
-            source_page_url="https://example.com/page",
-            image_url="https://example.com/img.jpg",
+            source_page_url="https://example.com/page",  # type: ignore[arg-type]
+            image_url="https://example.com/img.jpg",  # type: ignore[arg-type]
             discovery_method="SERP",
         )
         self.assertIsInstance(entry.timestamp, datetime)
@@ -24,8 +24,8 @@ class TestProvenanceModels(unittest.TestCase):
     def test_preview_result_to_dict(self):
         entry = ProvenanceEntry(
             topic="富士山",
-            source_page_url="https://example.com/page",
-            image_url="https://example.com/img.jpg",
+            source_page_url="https://example.com/page",  # type: ignore[arg-type]
+            image_url="https://example.com/img.jpg",  # type: ignore[arg-type]
             discovery_method="SERP",
         )
         log = QueryLogEntry(topic="富士山", provider="duckduckgo", query="富士山")

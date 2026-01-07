@@ -1,7 +1,7 @@
 # Makefile - image-saver 開発コマンド集
 # 使い方: make help
 
-.PHONY: help setup sync ui api test test-v lint format check clean scrape topic
+.PHONY: help setup sync ui api test test-v lint format typecheck check clean scrape topic
 
 # デフォルト: ヘルプ表示
 .DEFAULT_GOAL := help
@@ -82,7 +82,10 @@ lint: ## Ruff リントチェック
 format: ## Ruff フォーマット
 	uv run ruff format .
 
-check: format lint test ## フォーマット + リント + テスト（コミット前推奨）
+typecheck: ## 型チェック (ty)
+	uv run ty check src
+
+check: format lint typecheck test ## フォーマット + リント + 型チェック + テスト（コミット前推奨）
 
 #==============================================================================
 # ユーティリティ

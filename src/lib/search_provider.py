@@ -9,26 +9,31 @@ from __future__ import annotations
 import logging
 import time
 import warnings
-from typing import Callable, List, Optional
+from typing import Any, Callable, Optional
 from urllib.parse import urlparse
+
+from src.lib.domain.types import narrow_image_result_source, narrow_text_result_href
 
 logger = logging.getLogger(__name__)
 
 # Optional import for ddgs (formerly duckduckgo_search)
+# DDGS is an optional dependency - type is Any when unavailable
 _HAS_DDGS = False
-DDGS = None
+DDGS: type[Any] | None = None
 
 # Suppress deprecation warning from old package name
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", message=".*duckduckgo_search.*renamed.*ddgs.*")
     try:
-        from ddgs import DDGS
+        from ddgs import DDGS as _DDGS
 
+        DDGS = _DDGS
         _HAS_DDGS = True
     except ImportError:
         try:
-            from duckduckgo_search import DDGS
+            from duckduckgo_search import DDGS as _DDGS  # ty: ignore[unresolved-import]
 
+            DDGS = _DDGS
             _HAS_DDGS = True
         except ImportError:
             pass
@@ -82,17 +87,18 @@ def _search_with_retry(func, topic: str, max_retries: int = 3, base_delay: float
     return None
 
 
-def _search_duckduckgo(topic: str, max_pages: int) -> List[str]:
+def _search_duckduckgo(topic: str, max_pages: int) -> list[str]:
     """Search DuckDuckGo using ddgs library."""
     if not _HAS_DDGS:
         logger.warning("ddgs not installed; returning empty results")
         return []
 
-    urls: List[str] = []
+    urls: list[str] = []
 
     def _do_search():
         nonlocal urls
         _wait_rate_limit()
+        assert DDGS is not None  # Guaranteed by _HAS_DDGS check
         with DDGS() as ddgs:
             # Search for text results (pages containing images)
             query = f"{topic} images"
@@ -101,7 +107,7 @@ def _search_duckduckgo(topic: str, max_pages: int) -> List[str]:
             for r in results:
                 if len(urls) >= max_pages:
                     break
-                href = r.get("href") or r.get("link") or ""
+                href = narrow_text_result_href(r)
                 if _is_valid_url(href):
                     urls.append(href)
         return urls
@@ -115,7 +121,7 @@ def _search_duckduckgo(topic: str, max_pages: int) -> List[str]:
     return urls
 
 
-def _search_duckduckgo_images(topic: str, max_pages: int) -> List[str]:
+def _search_duckduckgo_images(topic: str, max_pages: int) -> list[str]:
     """Search DuckDuckGo Images directly for image source pages."""
     if not _HAS_DDGS:
         logger.warning("ddgs not installed; returning empty results")
@@ -126,6 +132,7 @@ def _search_duckduckgo_images(topic: str, max_pages: int) -> List[str]:
     def _do_search():
         nonlocal source_pages
         _wait_rate_limit()
+        assert DDGS is not None  # Guaranteed by _HAS_DDGS check
         with DDGS() as ddgs:
             results = list(ddgs.images(topic, max_results=max_pages * 5))
 
@@ -133,7 +140,7 @@ def _search_duckduckgo_images(topic: str, max_pages: int) -> List[str]:
                 if len(source_pages) >= max_pages:
                     break
                 # images() returns 'url' for image and 'source' for page
-                page_url = r.get("source") or r.get("url") or ""
+                page_url = narrow_image_result_source(r)
                 if _is_valid_url(page_url) and page_url not in source_pages:
                     source_pages.add(page_url)
         return source_pages
@@ -147,7 +154,7 @@ def _search_duckduckgo_images(topic: str, max_pages: int) -> List[str]:
     return list(source_pages)[:max_pages]
 
 
-def search_pages(topic: str, provider: str = "duckduckgo", max_pages: int = 20) -> List[str]:
+def search_pages(topic: str, provider: str = "duckduckgo", max_pages: int = 20) -> list[str]:
     """Search for candidate pages containing images related to topic.
 
     Args:

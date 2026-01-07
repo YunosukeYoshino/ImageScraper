@@ -16,18 +16,22 @@ import logging
 import os
 import re
 from datetime import datetime, timezone
-from typing import Callable, List, Optional, Tuple
+from typing import Any, Callable, Optional
 from urllib.parse import urlparse
 
+from pydantic import HttpUrl
+
+from . import search_provider
+from .domain.types import ProvenanceRecordDict, QueryLogDict
+
+# Runtime import with availability check for PIL
 try:
     from PIL import Image
 
     HAS_PIL = True
 except ImportError:
-    Image = None
+    Image: Any = None
     HAS_PIL = False
-
-from . import search_provider
 from .image_scraper import (
     download_images_parallel,
     list_images_with_metadata,
@@ -93,7 +97,7 @@ def discover_topic(topic: str, limit: int = 50) -> PreviewResult:
         logger.warning("search_provider.error topic=%s err=%s", topic, e)
         page_urls = []
 
-    images_collected: List[ProvenanceEntry] = []
+    images_collected: list[ProvenanceEntry] = []
     pages_considered = 0
     for page in page_urls:
         if limit and len(images_collected) >= limit:
@@ -112,8 +116,9 @@ def discover_topic(topic: str, limit: int = 50) -> PreviewResult:
             if limit and len(images_collected) >= limit:
                 break
             # Calculate relevance score
-            filename = extract_filename_from_url(meta.url)
-            domain = extract_domain_from_url(meta.url)
+            image_url_str = str(meta.url)
+            filename = extract_filename_from_url(image_url_str)
+            domain = extract_domain_from_url(image_url_str)
             score = calculate_relevance_score(
                 topic=topic,
                 alt_text=meta.alt,
@@ -124,8 +129,8 @@ def discover_topic(topic: str, limit: int = 50) -> PreviewResult:
             images_collected.append(
                 ProvenanceEntry(
                     topic=topic,
-                    source_page_url=page,
-                    image_url=meta.url,
+                    source_page_url=HttpUrl(page),
+                    image_url=HttpUrl(meta.url),
                     discovery_method="SERP",
                     relevance_score=score,
                     alt_text=meta.alt,
@@ -151,7 +156,7 @@ def discover_topic(topic: str, limit: int = 50) -> PreviewResult:
         ts = datetime.now(timezone.utc).strftime("%Y%m%d")
         fn = f"{ts}_{_slugify_topic(topic)}.json"
         path = os.path.join(_DISCOVERY_LOG_DIR, fn)
-        payload = {
+        payload: QueryLogDict = {
             "topic": topic,
             "provider": DEFAULT_PROVIDER,
             "query": topic,
@@ -183,9 +188,9 @@ def discover_topic(topic: str, limit: int = 50) -> PreviewResult:
 
 
 def filter_entries(
-    entries: List[ProvenanceEntry],
+    entries: list[ProvenanceEntry],
     download_filter: Optional[DownloadFilter] = None,
-) -> List[ProvenanceEntry]:
+) -> list[ProvenanceEntry]:
     """Apply filters to provenance entries.
 
     Args:
@@ -198,7 +203,7 @@ def filter_entries(
     if not download_filter:
         return entries
 
-    filtered: List[ProvenanceEntry] = []
+    filtered: list[ProvenanceEntry] = []
     for entry in entries:
         image_url = str(entry.image_url)
         parsed = urlparse(image_url)
@@ -249,6 +254,7 @@ def _check_image_resolution(filepath: str, min_width: Optional[int], min_height:
         return True
 
     try:
+        assert Image is not None  # Guaranteed by HAS_PIL check above
         with Image.open(filepath) as img:
             width, height = img.size
             if min_width is not None and width < min_width:
@@ -274,14 +280,14 @@ def _check_image_resolution(filepath: str, min_width: Optional[int], min_height:
 
 
 def download_selected(
-    entries: List[ProvenanceEntry],
+    entries: list[ProvenanceEntry],
     output_dir: str,
     download_filter: Optional[DownloadFilter] = None,
     max_workers: int = 8,
     respect_robots: bool = True,
     progress_cb: Optional[Callable[[int, int], None]] = None,
     write_provenance_index: bool = False,
-) -> Tuple[List[str], Optional[str]]:
+) -> tuple[list[str], Optional[str]]:
     """Download selected images and optionally write provenance_index.json.
 
     Args:
@@ -355,7 +361,7 @@ def download_selected(
 
     url_hash_to_url = {hashlib.sha256(url.encode("utf-8")).hexdigest()[:16]: url for url in image_urls}
 
-    provenance_records = []
+    provenance_records: list[ProvenanceRecordDict] = []
     for saved_path in saved_files:
         filename = os.path.basename(saved_path)
         # ファイル名から拡張子を除いたハッシュ部分を取得
@@ -369,16 +375,16 @@ def download_selected(
 
         entry = url_to_entry.get(original_url)
         if entry:
-            provenance_records.append(
-                {
-                    "filename": filename,
-                    "image_url": str(entry.image_url),
-                    "source_page_url": str(entry.source_page_url),
-                    "topic": entry.topic,
-                    "discovery_method": entry.discovery_method,
-                    "timestamp": entry.timestamp.isoformat() if entry.timestamp else None,
-                }
-            )
+            record: ProvenanceRecordDict = {
+                "filename": filename,
+                "image_url": str(entry.image_url),
+                "source_page_url": str(entry.source_page_url),
+                "topic": entry.topic,
+                "discovery_method": entry.discovery_method,
+            }
+            if entry.timestamp:
+                record["timestamp"] = entry.timestamp.isoformat()
+            provenance_records.append(record)
 
     # Write provenance_index.json
     os.makedirs(output_dir, exist_ok=True)
