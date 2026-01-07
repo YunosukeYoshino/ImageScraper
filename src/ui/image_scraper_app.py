@@ -197,7 +197,7 @@ if preview_urls:
         col = cols[idx_global % 5]
         u_str = str(u)
         with col:
-            st.image(u_str, caption=Path(u_str).name, use_container_width=True)
+            st.image(u_str, caption=Path(u_str).name, width="stretch")
             # Show relevance badge for topic mode
             entry = url_to_entry.get(u_str)
             if entry:
@@ -296,7 +296,7 @@ if preview_urls:
                         grid = st.columns(5)
                         for i, p in enumerate(paths[:20]):  # Show max 20 thumbnails
                             with grid[i % 5]:
-                                st.image(p, caption="✅ " + Path(p).name, use_container_width=True)
+                                st.image(p, caption="✅ " + Path(p).name, width="stretch")
 
                         # Offer ZIP download to user
                         import io
