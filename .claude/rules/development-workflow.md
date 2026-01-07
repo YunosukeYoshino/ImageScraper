@@ -5,19 +5,57 @@ globs: ["*"]
 
 # Development Workflow
 
-## Quality Checks
+## Command Reference
 
-コード変更後、必ず以下を実行:
+**`make help` で全コマンド一覧表示**
+
+### セットアップ
 
 ```bash
-# 1. フォーマット
-uv run ruff format .
+make setup         # 初回セットアップ（依存関係 + pre-commit）
+make sync          # 依存関係の同期
+make sync-drive    # Google Drive機能付きで同期
+```
 
-# 2. リント（自動修正）
-uv run ruff check --fix .
+### アプリケーション実行
 
-# 3. テスト
-uv run python -m unittest discover -s tests/unit
+```bash
+make ui            # Streamlit UI起動
+make api           # FastAPI サーバー起動（開発モード）
+```
+
+### CLI（画像スクレイピング）
+
+```bash
+# URLから画像取得
+make scrape URL=https://example.com
+make scrape URL=https://example.com LIMIT=10 OUT=downloads
+
+# トピック探索
+make topic KEYWORD="富士山"
+make topic KEYWORD="富士山" LIMIT=100
+
+# トピック探索 + ダウンロード
+make topic-download KEYWORD="富士山" OUT=images
+```
+
+### 品質チェック
+
+```bash
+make check         # フォーマット + リント + テスト（コミット前推奨）
+make format        # Ruff フォーマット
+make lint          # Ruff リントチェック
+make test          # ユニットテスト
+make test-v        # ユニットテスト（詳細出力）
+make clean         # キャッシュ・一時ファイル削除
+```
+
+### uv 直接実行（必要な場合のみ）
+
+```bash
+uv run image-scrape --help                    # CLIヘルプ
+uv run image-scrape --url URL                 # URL指定
+uv run image-scrape --topic "検索ワード"       # トピック探索
 ```
 
 ## Pre-commit Hooks

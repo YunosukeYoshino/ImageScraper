@@ -238,7 +238,7 @@ class TestDownloadSelected(unittest.TestCase):
                 with open(p, "wb") as f:
                     f.write(b"fake")
 
-            saved, index_path = download_selected(entries, tmpdir)
+            saved, index_path = download_selected(entries, tmpdir, write_provenance_index=True)
 
             self.assertEqual(len(saved), 2)
             self.assertTrue(os.path.exists(index_path))
@@ -273,7 +273,7 @@ class TestDownloadSelected(unittest.TestCase):
     def test_download_selected_empty_entries_still_writes_index(self):
         """Even with no entries, provenance_index.json should be created."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            saved, index_path = download_selected([], tmpdir)
+            saved, index_path = download_selected([], tmpdir, write_provenance_index=True)
 
             self.assertEqual(saved, [])
             self.assertTrue(os.path.exists(index_path))

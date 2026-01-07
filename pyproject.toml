@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 authors = [{name = "Unknown"}]
 description = "Web page image scraper with optional Google Drive upload"
@@ -31,6 +35,10 @@ dev = [
 #   Linux: curl https://rclone.org/install.sh | sudo bash
 #   Or use: ./scripts/setup_rclone.sh
 
+[project.scripts]
+# CLIエントリポイント: uv run image-scrape で実行可能
+image-scrape = "src.cli.scrape_images:main"
+
 [tool.ruff]
 line-length = 120
 target-version = "py311"
@@ -42,6 +50,9 @@ select = ["B", "E", "F", "I"]
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
 
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
 [tool.uv]
-# Minimal uv table; remove unsupported sub-tables to avoid warnings
+package = true  # project.scripts のエントリポイントを有効化
 

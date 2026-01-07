@@ -53,3 +53,5 @@ node_modules/
 build/
 
 discovery_logs/
+
+image_saver.egg-info/
